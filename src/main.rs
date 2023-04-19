@@ -10,7 +10,7 @@ use std::ffi::CString;
 use std::{fs, ptr};
 
 fn main() {
-    // init gl resources
+    // init gl window / ctx
     let window = WindowBuilder::new()
         .with_inner_size(LogicalSize::new(500.0, 500.0))
         .with_title("window");
@@ -24,29 +24,17 @@ fn main() {
         ctx = ctx_builder.unwrap().make_current().unwrap();
         gl::load_with(|ptr| ctx.get_proc_address(ptr) as *const _);
     }
+
+    // init gl resources
     let program = Program::new_from_files("./shaders/vert.glsl", "./shaders/frag.glsl").unwrap();
     let data: [f32; 9] = [0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 0.0];
     let buffer = Buffer::new(&data, gl::STATIC_DRAW);
+    let pos_loc = program.get_attrib_location("position").unwrap();
+    let vertex_array = VertexArray::new();
+    vertex_array.set_attribute(pos_loc, 3, 3, 0);
     program.bind();
     buffer.bind();
-
-    let pos_loc = program.get_attrib_location("position").unwrap();
-    let float_size = core::mem::size_of::<f32>() as i32;
-    let off: i32 = 0;
-    unsafe {
-        let mut id: GLuint = 0;
-        gl::GenVertexArrays(1, &mut id);
-        gl::BindVertexArray(id);
-        gl::VertexAttribPointer(
-            pos_loc,
-            3,
-            gl::FLOAT,
-            gl::FALSE,
-            3 * float_size,
-            (off * float_size) as *const gl::types::GLvoid,
-        );
-        gl::EnableVertexAttribArray(pos_loc);
-    }
+    vertex_array.bind();
 
     // begin draw loop
     ctx.swap_buffers().unwrap();
@@ -60,6 +48,7 @@ fn main() {
             Event::LoopDestroyed => {
                 program.drop();
                 buffer.drop();
+                vertex_array.drop();
             }
             Event::RedrawRequested(_) => unsafe {
                 gl::Clear(gl::COLOR_BUFFER_BIT);
@@ -253,6 +242,59 @@ impl Drop for Buffer {
     fn drop(&self) {
         unsafe {
             gl::DeleteBuffers(1, [self.id].as_ptr());
+        }
+    }
+}
+
+pub struct VertexArray {
+    pub id: GLuint,
+}
+
+impl VertexArray {
+    pub fn new() -> Self {
+        let mut id: GLuint = 0;
+        unsafe {
+            gl::GenVertexArrays(1, &mut id);
+        }
+        Self { id }
+    }
+
+    pub fn set_attribute(&self, location: GLuint, size: i32, stride: i32, offset: i32) {
+        self.bind();
+        let fsize = std::mem::size_of::<f32>() as i32;
+        unsafe {
+            gl::VertexAttribPointer(
+                location,
+                size,
+                gl::FLOAT,
+                gl::FALSE,
+                stride * fsize,
+                (offset * fsize) as *const _,
+            );
+            gl::EnableVertexAttribArray(location);
+        }
+    }
+}
+
+// appease clippy
+impl Default for VertexArray {
+    fn default() -> Self {
+        VertexArray::new()
+    }
+}
+
+impl Drop for VertexArray {
+    fn drop(&self) {
+        unsafe {
+            gl::DeleteVertexArrays(1, [self.id].as_ptr());
+        }
+    }
+}
+
+impl Bind for VertexArray {
+    fn bind(&self) {
+        unsafe {
+            gl::BindVertexArray(self.id);
         }
     }
 }
