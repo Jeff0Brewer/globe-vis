@@ -28,6 +28,7 @@ fn main() {
     unsafe {
         ctx = ctx_builder.unwrap().make_current().unwrap();
         gl::load_with(|ptr| ctx.get_proc_address(ptr) as *const _);
+        gl::Enable(gl::DEPTH_TEST);
     }
 
     // init gl resources
@@ -71,7 +72,7 @@ fn main() {
                 vertex_array.drop();
             }
             Event::RedrawRequested(_) => unsafe {
-                gl::Clear(gl::COLOR_BUFFER_BIT);
+                gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT);
                 gl::DrawArrays(gl::TRIANGLES, 0, (data.len() / 3) as i32);
                 ctx.swap_buffers().unwrap();
             },
