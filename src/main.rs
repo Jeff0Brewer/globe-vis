@@ -1,6 +1,6 @@
 extern crate gl;
 extern crate glutin;
-use gl::types::{GLenum, GLint, GLsizeiptr, GLuint};
+use gl::types::{GLenum, GLint, GLuint};
 use glutin::dpi::LogicalSize;
 use glutin::event::{Event, WindowEvent};
 use glutin::event_loop::{ControlFlow, EventLoop};
@@ -25,25 +25,18 @@ fn main() {
         gl::load_with(|ptr| ctx.get_proc_address(ptr) as *const _);
     }
     let program = Program::new_from_files("./shaders/vert.glsl", "./shaders/frag.glsl").unwrap();
+    let data: [f32; 9] = [0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 0.0];
+    let buffer = Buffer::new(&data, gl::STATIC_DRAW);
     program.bind();
+    buffer.bind();
+
     let pos_loc = program.get_attrib_location("position").unwrap();
     let float_size = core::mem::size_of::<f32>() as i32;
-    let data: [f32; 9] = [0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 0.0];
-    let mut buffer: GLuint = 0;
     let off: i32 = 0;
     unsafe {
         let mut id: GLuint = 0;
         gl::GenVertexArrays(1, &mut id);
         gl::BindVertexArray(id);
-        gl::GenBuffers(1, &mut buffer);
-        gl::BindBuffer(gl::ARRAY_BUFFER, buffer);
-        let (_, bytes, _) = data.align_to::<u8>();
-        gl::BufferData(
-            gl::ARRAY_BUFFER,
-            bytes.len() as GLsizeiptr,
-            bytes.as_ptr() as *const _,
-            gl::STATIC_DRAW,
-        );
         gl::VertexAttribPointer(
             pos_loc,
             3,
@@ -66,6 +59,7 @@ fn main() {
             },
             Event::LoopDestroyed => {
                 program.drop();
+                buffer.drop();
             }
             Event::RedrawRequested(_) => unsafe {
                 gl::Clear(gl::COLOR_BUFFER_BIT);
@@ -75,11 +69,6 @@ fn main() {
             _ => (),
         }
     });
-}
-
-#[repr(C)]
-pub struct PosVert {
-    pub position: [f32; 3],
 }
 
 pub trait Drop {
@@ -219,6 +208,51 @@ impl Bind for Program {
     fn bind(&self) {
         unsafe {
             gl::UseProgram(self.id);
+        }
+    }
+}
+
+pub struct Buffer {
+    pub id: GLuint,
+}
+
+impl Buffer {
+    fn new(data: &[f32], draw_type: GLuint) -> Self {
+        let mut id: GLuint = 0;
+        unsafe {
+            gl::GenBuffers(1, &mut id);
+        }
+        let buffer = Self { id };
+        buffer.set_data(data, draw_type);
+        buffer
+    }
+
+    pub fn set_data(&self, data: &[f32], draw_type: GLuint) {
+        self.bind();
+        unsafe {
+            let (_, bytes, _) = data.align_to::<u8>();
+            gl::BufferData(
+                gl::ARRAY_BUFFER,
+                bytes.len() as isize,
+                bytes.as_ptr() as *const _,
+                draw_type,
+            )
+        }
+    }
+}
+
+impl Bind for Buffer {
+    fn bind(&self) {
+        unsafe {
+            gl::BindBuffer(gl::ARRAY_BUFFER, self.id);
+        }
+    }
+}
+
+impl Drop for Buffer {
+    fn drop(&self) {
+        unsafe {
+            gl::DeleteBuffers(1, [self.id].as_ptr());
         }
     }
 }
