@@ -1,12 +1,14 @@
 extern crate gl;
 extern crate glutin;
 mod gl_wrap;
+mod icosphere;
 use gl_wrap::{Bind, Buffer, Drop, Program, VertexArray};
 use glutin::dpi::LogicalSize;
 use glutin::event::{Event, WindowEvent};
 use glutin::event_loop::{ControlFlow, EventLoop};
 use glutin::window::WindowBuilder;
 use glutin::{Api, ContextBuilder, GlRequest};
+use icosphere::get_icosphere;
 
 fn main() {
     // init gl window / ctx
@@ -26,7 +28,7 @@ fn main() {
 
     // init gl resources
     let program = Program::new_from_files("./shaders/vert.glsl", "./shaders/frag.glsl").unwrap();
-    let data: [f32; 9] = [0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 0.0];
+    let data = get_icosphere(4);
     let buffer = Buffer::new(&data, gl::STATIC_DRAW);
     let pos_loc = program.get_attrib_location("position").unwrap();
     let vertex_array = VertexArray::new();
@@ -51,7 +53,7 @@ fn main() {
             }
             Event::RedrawRequested(_) => unsafe {
                 gl::Clear(gl::COLOR_BUFFER_BIT);
-                gl::DrawArrays(gl::TRIANGLES, 0, 3);
+                gl::DrawArrays(gl::TRIANGLES, 0, (data.len() / 3) as i32);
                 ctx.swap_buffers().unwrap();
             },
             _ => (),
