@@ -1,6 +1,6 @@
 extern crate gl;
 extern crate glutin;
-use gl::types::{GLenum, GLint, GLuint};
+use gl::types::GLenum;
 use glutin::dpi::LogicalSize;
 use glutin::event::{Event, WindowEvent};
 use glutin::event_loop::{ControlFlow, EventLoop};
@@ -69,7 +69,7 @@ pub trait Bind {
 }
 
 pub struct Shader {
-    pub id: GLuint,
+    pub id: u32,
 }
 
 impl Shader {
@@ -86,7 +86,7 @@ impl Shader {
         }
 
         // check if shader compiled successfully
-        let mut success: GLint = 0;
+        let mut success: i32 = 0;
         unsafe {
             gl::GetShaderiv(shader.id, gl::COMPILE_STATUS, &mut success);
         }
@@ -94,7 +94,7 @@ impl Shader {
             Ok(shader)
         } else {
             // get shader info log and throw error on compilation failure
-            let mut log_size: GLint = 0;
+            let mut log_size: i32 = 0;
             unsafe {
                 gl::GetShaderiv(shader.id, gl::INFO_LOG_LENGTH, &mut log_size);
             }
@@ -121,7 +121,7 @@ impl Drop for Shader {
 }
 
 pub struct Program {
-    pub id: GLuint,
+    pub id: u32,
 }
 
 impl Program {
@@ -138,7 +138,7 @@ impl Program {
         }
 
         // check if program linked successfully
-        let mut success: GLint = 0;
+        let mut success: i32 = 0;
         unsafe {
             gl::GetProgramiv(program.id, gl::LINK_STATUS, &mut success);
         }
@@ -146,7 +146,7 @@ impl Program {
             Ok(program)
         } else {
             // get program info log and throw error on linking failure
-            let mut log_size: GLint = 0;
+            let mut log_size: i32 = 0;
             unsafe {
                 gl::GetProgramiv(program.id, gl::INFO_LOG_LENGTH, &mut log_size);
             }
@@ -179,9 +179,9 @@ impl Program {
         result
     }
 
-    pub fn get_attrib_location(&self, attrib: &str) -> Result<GLuint, ProgramError> {
+    pub fn get_attrib_location(&self, attrib: &str) -> Result<u32, ProgramError> {
         let attrib = CString::new(attrib)?;
-        unsafe { Ok(gl::GetAttribLocation(self.id, attrib.as_ptr()) as GLuint) }
+        unsafe { Ok(gl::GetAttribLocation(self.id, attrib.as_ptr()) as u32) }
     }
 }
 
@@ -202,12 +202,12 @@ impl Bind for Program {
 }
 
 pub struct Buffer {
-    pub id: GLuint,
+    pub id: u32,
 }
 
 impl Buffer {
-    fn new(data: &[f32], draw_type: GLuint) -> Self {
-        let mut id: GLuint = 0;
+    fn new(data: &[f32], draw_type: u32) -> Self {
+        let mut id: u32 = 0;
         unsafe {
             gl::GenBuffers(1, &mut id);
         }
@@ -216,7 +216,7 @@ impl Buffer {
         buffer
     }
 
-    pub fn set_data(&self, data: &[f32], draw_type: GLuint) {
+    pub fn set_data(&self, data: &[f32], draw_type: u32) {
         self.bind();
         unsafe {
             let (_, bytes, _) = data.align_to::<u8>();
@@ -247,19 +247,19 @@ impl Drop for Buffer {
 }
 
 pub struct VertexArray {
-    pub id: GLuint,
+    pub id: u32,
 }
 
 impl VertexArray {
     pub fn new() -> Self {
-        let mut id: GLuint = 0;
+        let mut id: u32 = 0;
         unsafe {
             gl::GenVertexArrays(1, &mut id);
         }
         Self { id }
     }
 
-    pub fn set_attribute(&self, location: GLuint, size: i32, stride: i32, offset: i32) {
+    pub fn set_attribute(&self, location: u32, size: i32, stride: i32, offset: i32) {
         self.bind();
         let fsize = std::mem::size_of::<f32>() as i32;
         unsafe {
