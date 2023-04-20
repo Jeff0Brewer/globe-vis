@@ -125,9 +125,28 @@ impl Program {
         result
     }
 
-    pub fn get_attrib_location(&self, attrib: &str) -> Result<u32, ProgramError> {
-        let attrib = CString::new(attrib)?;
-        unsafe { Ok(gl::GetAttribLocation(self.id, attrib.as_ptr()) as u32) }
+    pub fn set_attrib(
+        &self,
+        name: &str,
+        size: i32,
+        stride: i32,
+        offset: i32,
+    ) -> Result<(), ProgramError> {
+        let name = CString::new(name)?;
+        let fsize = std::mem::size_of::<f32>() as i32;
+        unsafe {
+            let location = gl::GetAttribLocation(self.id, name.as_ptr()) as u32;
+            gl::VertexAttribPointer(
+                location,
+                size,
+                gl::FLOAT,
+                gl::FALSE,
+                stride * fsize,
+                (offset * fsize) as *const _,
+            );
+            gl::EnableVertexAttribArray(location);
+        }
+        Ok(())
     }
 }
 
@@ -188,60 +207,6 @@ impl Drop for Buffer {
     fn drop(&self) {
         unsafe {
             gl::DeleteBuffers(1, [self.id].as_ptr());
-        }
-    }
-}
-
-pub struct VertexArray {
-    pub id: u32,
-}
-
-impl VertexArray {
-    pub fn new() -> Self {
-        let mut id: u32 = 0;
-        unsafe {
-            gl::GenVertexArrays(1, &mut id);
-        }
-        Self { id }
-    }
-
-    pub fn set_attribute(&self, location: u32, size: i32, stride: i32, offset: i32) {
-        self.bind();
-        // use fload size since data is array of f32
-        let fsize = std::mem::size_of::<f32>() as i32;
-        unsafe {
-            gl::VertexAttribPointer(
-                location,
-                size,
-                gl::FLOAT,
-                gl::FALSE,
-                stride * fsize,
-                (offset * fsize) as *const _,
-            );
-            gl::EnableVertexAttribArray(location);
-        }
-    }
-}
-
-// appease clippy
-impl Default for VertexArray {
-    fn default() -> Self {
-        VertexArray::new()
-    }
-}
-
-impl Drop for VertexArray {
-    fn drop(&self) {
-        unsafe {
-            gl::DeleteVertexArrays(1, [self.id].as_ptr());
-        }
-    }
-}
-
-impl Bind for VertexArray {
-    fn bind(&self) {
-        unsafe {
-            gl::BindVertexArray(self.id);
         }
     }
 }
