@@ -51,11 +51,22 @@ fn main() {
         0.01,
         10.0,
     );
-    let mut mvp = proj_mat.mul_mat4(&view_mat);
-    let cname = CString::new("mvp").unwrap();
-    let mvp_loc;
+    let view_proj_mat = proj_mat.mul_mat4(&view_mat);
+    let view_proj_name = CString::new("viewProjMatrix").unwrap();
+    let mut model_matrix = Mat4::IDENTITY;
+    let model_name = CString::new("modelMatrix").unwrap();
+    let model_loc;
     unsafe {
-        mvp_loc = gl::GetUniformLocation(program.id, cname.as_ptr());
+        // get model location for updates while drawing
+        model_loc = gl::GetUniformLocation(program.id, model_name.as_ptr());
+        // set static view proj mat once
+        let view_proj_loc = gl::GetUniformLocation(program.id, view_proj_name.as_ptr());
+        gl::UniformMatrix4fv(
+            view_proj_loc,
+            1,
+            gl::FALSE,
+            &view_proj_mat.to_cols_array()[0],
+        );
     }
 
     // begin draw loop
@@ -70,7 +81,7 @@ fn main() {
                         let dx = position.x - mouse_pos.x;
                         let dy = position.y - mouse_pos.y;
                         let rotation = rotation_from_mouse(dx, dy);
-                        mvp = mvp.mul_mat4(&rotation);
+                        model_matrix = model_matrix.mul_mat4(&rotation);
                         ctx.window().request_redraw();
                     }
                     mouse_pos = PhysicalPosition {
@@ -92,7 +103,7 @@ fn main() {
             }
             Event::RedrawRequested(_) => unsafe {
                 gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT);
-                gl::UniformMatrix4fv(mvp_loc, 1, gl::FALSE, &mvp.to_cols_array()[0]);
+                gl::UniformMatrix4fv(model_loc, 1, gl::FALSE, &model_matrix.to_cols_array()[0]);
                 gl::DrawArrays(gl::TRIANGLES, 0, (data.len() / 3) as i32);
                 ctx.swap_buffers().unwrap();
             },
