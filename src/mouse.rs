@@ -1,9 +1,11 @@
 use glam::{Mat4, Quat, Vec3};
 
+const ROT_SPEED: f64 = 0.05;
+const ZOOM_SPEED: f64 = 0.03;
+
 pub fn rotate_from_mouse(mat: Mat4, dx: f64, dy: f64) -> Mat4 {
-    let rotation_speed = 0.05;
-    let x_rad = (dy * rotation_speed) as f32;
-    let y_rad = (dx * rotation_speed) as f32;
+    let x_rad = (dy * ROT_SPEED) as f32;
+    let y_rad = (dx * ROT_SPEED) as f32;
 
     // transform x / y axis by inverse of current rotation
     // to get rotation axis perpendicular to current view
@@ -18,7 +20,7 @@ pub fn rotate_from_mouse(mat: Mat4, dx: f64, dy: f64) -> Mat4 {
 }
 
 pub fn zoom_from_scroll(mat: Mat4, delta: f64) -> Mat4 {
-    let zoom = (delta * 0.03) as f32;
+    let zoom = (delta * ZOOM_SPEED) as f32;
     let scale = Mat4::from_scale(Vec3::splat(1.0 + zoom));
     mat.mul_mat4(&scale)
 }
@@ -49,8 +51,10 @@ mod tests {
         let dy = 20.0;
 
         let rotated_mat = rotate_from_mouse(mat, dx, dy);
-        let expected_x_rotation = Mat4::from_rotation_x(1.0);
-        let expected_y_rotation = Mat4::from_rotation_y(0.5);
+        let x_rad = (dy * ROT_SPEED) as f32;
+        let y_rad = (dx * ROT_SPEED) as f32;
+        let expected_x_rotation = Mat4::from_rotation_x(x_rad);
+        let expected_y_rotation = Mat4::from_rotation_y(y_rad);
 
         let expected_mat = mat.mul_mat4(&expected_x_rotation.mul_mat4(&expected_y_rotation));
 
@@ -63,7 +67,7 @@ mod tests {
         let delta = 30.0;
 
         let zoomed_mat = zoom_from_scroll(mat, delta);
-        let expected_zoom = 1.0 + (delta * 0.03) as f32;
+        let expected_zoom = 1.0 + (delta * ZOOM_SPEED) as f32;
         let expected_scale = Mat4::from_scale(Vec3::splat(expected_zoom));
         let expected_mat = mat.mul_mat4(&expected_scale);
 
