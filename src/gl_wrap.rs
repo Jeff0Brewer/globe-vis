@@ -168,6 +168,7 @@ impl Bind for Program {
 
 pub struct Buffer {
     pub id: u32,
+    pub draw_type: u32,
 }
 
 impl Buffer {
@@ -176,12 +177,12 @@ impl Buffer {
         unsafe {
             gl::GenBuffers(1, &mut id);
         }
-        let buffer = Self { id };
-        buffer.set_data(data, draw_type);
+        let buffer = Self { id, draw_type };
+        buffer.set_data(data);
         buffer
     }
 
-    pub fn set_data(&self, data: &[f32], draw_type: u32) {
+    pub fn set_data(&self, data: &[f32]) {
         self.bind();
         unsafe {
             let (_, bytes, _) = data.align_to::<u8>();
@@ -189,7 +190,7 @@ impl Buffer {
                 gl::ARRAY_BUFFER,
                 bytes.len() as isize,
                 bytes.as_ptr() as *const _,
-                draw_type,
+                self.draw_type,
             )
         }
     }
