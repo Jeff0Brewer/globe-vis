@@ -17,8 +17,9 @@ fn subdivide_icosphere(
     vert: Vec<[f32; 3]>,
     tri: Vec<[usize; 3]>,
 ) -> (Vec<[f32; 3]>, Vec<[usize; 3]>) {
-    let mut next_vert: Vec<[f32; 3]> = vec![];
-    let mut next_tri: Vec<[usize; 3]> = vec![];
+    // known final vec lengths, set capacity to prevent realloc
+    let mut next_vert: Vec<[f32; 3]> = Vec::with_capacity(tri.len() * 6);
+    let mut next_tri: Vec<[usize; 3]> = Vec::with_capacity(tri.len() * 4);
     for t in tri {
         let curr_ind = next_vert.len();
         next_vert.append(&mut vec![
