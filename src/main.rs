@@ -8,7 +8,7 @@ use glutin::dpi::LogicalSize;
 use glutin::event::{Event, WindowEvent};
 use glutin::event_loop::{ControlFlow, EventLoop};
 use glutin::window::WindowBuilder;
-use glutin::{Api, ContextBuilder, GlRequest};
+use glutin::{ContextBuilder, GlRequest};
 use icosphere::get_icosphere;
 use std::ffi::CString;
 
@@ -21,7 +21,11 @@ fn main() {
         .with_title("window");
     let event_loop = EventLoop::new();
     let ctx_builder = ContextBuilder::new()
-        .with_gl(GlRequest::Specific(Api::OpenGl, (3, 3)))
+        .with_gl(GlRequest::GlThenGles {
+            // version 2.0 for WebGL compatibility
+            opengl_version: (2, 0),
+            opengles_version: (2, 0),
+        })
         .with_multisampling(4)
         .build_windowed(window, &event_loop);
     let ctx;
@@ -36,11 +40,21 @@ fn main() {
     let data = get_icosphere(4);
     let buffer = Buffer::new(&data, gl::STATIC_DRAW);
     let pos_loc = program.get_attrib_location("position").unwrap();
-    let vertex_array = VertexArray::new();
-    vertex_array.set_attribute(pos_loc, 3, 3, 0);
+    let fsize = std::mem::size_of::<f32>() as i32;
+    let off: i32 = 0;
+    unsafe {
+        gl::VertexAttribPointer(
+            pos_loc,
+            3,
+            gl::FLOAT,
+            gl::FALSE,
+            3 * fsize,
+            (off * fsize) as *const _,
+        );
+        gl::EnableVertexAttribArray(pos_loc);
+    }
     program.bind();
     buffer.bind();
-    vertex_array.bind();
 
     // init mvp uniform
     let view_mat = Mat4::look_at_rh(Vec3::new(0.0, 0.0, 2.0), Vec3::ZERO, Vec3::Y);
@@ -69,7 +83,6 @@ fn main() {
             Event::LoopDestroyed => {
                 program.drop();
                 buffer.drop();
-                vertex_array.drop();
             }
             Event::RedrawRequested(_) => unsafe {
                 gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT);

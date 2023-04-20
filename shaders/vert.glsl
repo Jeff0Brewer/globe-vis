@@ -1,8 +1,6 @@
-#version 330
-
-in vec4 position;
+attribute vec4 position;
 uniform mat4 mvp;
-out vec4 testColor;
+varying vec4 testColor;
 
 void main() {
     gl_Position = mvp * position;

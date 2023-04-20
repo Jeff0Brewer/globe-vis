@@ -1,8 +1,5 @@
-#version 330
-
-in vec4 testColor;
-out vec4 FragColor;
+varying vec4 testColor;
 
 void main() {
-    FragColor = testColor;
+    gl_FragColor = testColor;
 }
