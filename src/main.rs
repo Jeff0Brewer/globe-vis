@@ -4,7 +4,7 @@ mod gl_wrap;
 mod icosphere;
 use gl_wrap::{Bind, Buffer, Drop, Program};
 use glam::{Mat4, Vec3};
-use glutin::dpi::LogicalSize;
+use glutin::dpi::{LogicalSize, PhysicalPosition};
 use glutin::event::{ElementState, Event, MouseButton, WindowEvent};
 use glutin::event_loop::{ControlFlow, EventLoop};
 use glutin::window::WindowBuilder;
@@ -51,23 +51,32 @@ fn main() {
         0.01,
         10.0,
     );
-    let mvp = proj_mat.mul_mat4(&view_mat).to_cols_array();
+    let mut mvp = proj_mat.mul_mat4(&view_mat);
     let cname = CString::new("mvp").unwrap();
+    let mvp_loc;
     unsafe {
-        let location = gl::GetUniformLocation(program.id, cname.as_ptr());
-        gl::UniformMatrix4fv(location, 1, gl::FALSE, &mvp[0]);
+        mvp_loc = gl::GetUniformLocation(program.id, cname.as_ptr());
     }
 
     // begin draw loop
     let mut drag_state = ElementState::Released;
+    let mut mouse_pos = PhysicalPosition { x: 0.0, y: 0.0 };
     event_loop.run(move |event, _, control_flow| {
         *control_flow = ControlFlow::Wait;
         match event {
             Event::WindowEvent { event, .. } => match event {
                 WindowEvent::CursorMoved { position, .. } => {
                     if let ElementState::Pressed = drag_state {
-                        println!("{} {}", position.x, position.y);
+                        let dx = position.x - mouse_pos.x;
+                        let dy = position.y - mouse_pos.y;
+                        let rotation = rotation_from_mouse(dx, dy);
+                        mvp = mvp.mul_mat4(&rotation);
+                        ctx.window().request_redraw();
                     }
+                    mouse_pos = PhysicalPosition {
+                        x: position.x,
+                        y: position.y,
+                    };
                 }
                 WindowEvent::MouseInput {
                     button: MouseButton::Left,
@@ -83,10 +92,20 @@ fn main() {
             }
             Event::RedrawRequested(_) => unsafe {
                 gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT);
+                gl::UniformMatrix4fv(mvp_loc, 1, gl::FALSE, &mvp.to_cols_array()[0]);
                 gl::DrawArrays(gl::TRIANGLES, 0, (data.len() / 3) as i32);
                 ctx.swap_buffers().unwrap();
             },
             _ => (),
         }
     });
+}
+
+fn rotation_from_mouse(dx: f64, dy: f64) -> Mat4 {
+    let rotation_speed = 0.1;
+    let x_rad = (-dy * rotation_speed) as f32;
+    let x_rotation = Mat4::from_rotation_x(x_rad);
+    let z_rad = (dx * rotation_speed) as f32;
+    let z_rotation = Mat4::from_rotation_z(z_rad);
+    x_rotation.mul_mat4(&z_rotation)
 }
