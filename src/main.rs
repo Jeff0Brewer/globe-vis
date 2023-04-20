@@ -73,6 +73,9 @@ fn main() {
         gl::UniformMatrix4fv(model_loc, 1, gl::FALSE, &model_mat.to_cols_array()[0]);
     }
 
+    let mut buf_change = 1.0;
+    let mut buf_change_dir = 1.0;
+
     // begin draw loop
     let mut drag_state = ElementState::Released;
     let mut mouse_pos = PhysicalPosition { x: 0.0, y: 0.0 };
@@ -125,11 +128,20 @@ fn main() {
                 program.drop();
                 buffer.drop();
             }
-            Event::RedrawRequested(_) => unsafe {
-                gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT);
-                gl::DrawArrays(gl::TRIANGLES, 0, (data.len() / 3) as i32);
+            Event::RedrawRequested(_) => {
+                if !(0.5..1.0).contains(&buf_change) {
+                    buf_change_dir = -buf_change_dir;
+                }
+                buf_change += buf_change_dir * 0.001;
+                let data: Vec<f32> = data.iter().map(|x| x * buf_change).collect();
+                buffer.set_data(&data, gl::DYNAMIC_DRAW);
+                unsafe {
+                    gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT);
+                    gl::DrawArrays(gl::TRIANGLES, 0, (data.len() / 3) as i32);
+                }
                 ctx.swap_buffers().unwrap();
-            },
+                ctx.window().request_redraw();
+            }
             _ => (),
         }
     });
