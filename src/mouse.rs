@@ -22,3 +22,51 @@ pub fn zoom_from_scroll(mat: Mat4, delta: f64) -> Mat4 {
     let scale = Mat4::from_scale(Vec3::splat(1.0 + zoom));
     mat.mul_mat4(&scale)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use glam::{Mat4, Vec3};
+
+    fn assert_matrix_elements_near_eq(a: Mat4, b: Mat4, epsilon: f32) {
+        let a = a.to_cols_array();
+        let b = b.to_cols_array();
+        for i in 0..16 {
+            assert!(
+                (a[i] - b[i]).abs() < epsilon,
+                "Matrices not equal at element {}: {} != {}",
+                i,
+                a[i],
+                b[i]
+            );
+        }
+    }
+
+    #[test]
+    fn test_rotate_from_mouse() {
+        let mat = Mat4::IDENTITY;
+        let dx = 10.0;
+        let dy = 20.0;
+
+        let rotated_mat = rotate_from_mouse(mat, dx, dy);
+        let expected_x_rotation = Mat4::from_rotation_x(1.0);
+        let expected_y_rotation = Mat4::from_rotation_y(0.5);
+
+        let expected_mat = mat.mul_mat4(&expected_x_rotation.mul_mat4(&expected_y_rotation));
+
+        assert_matrix_elements_near_eq(rotated_mat, expected_mat, 1e-6);
+    }
+
+    #[test]
+    fn test_zoom_from_scroll() {
+        let mat = Mat4::IDENTITY;
+        let delta = 30.0;
+
+        let zoomed_mat = zoom_from_scroll(mat, delta);
+        let expected_zoom = 1.0 + (delta * 0.03) as f32;
+        let expected_scale = Mat4::from_scale(Vec3::splat(expected_zoom));
+        let expected_mat = mat.mul_mat4(&expected_scale);
+
+        assert_matrix_elements_near_eq(zoomed_mat, expected_mat, 1e-6);
+    }
+}
