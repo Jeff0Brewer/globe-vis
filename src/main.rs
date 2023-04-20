@@ -39,7 +39,7 @@ fn main() {
 
     // init gl resources
     let data = get_icosphere(4);
-    let buffer = Buffer::new(&data, gl::STATIC_DRAW);
+    let buffer = Buffer::new(&data, gl::DYNAMIC_DRAW);
     let program = Program::new_from_files("./shaders/vert.glsl", "./shaders/frag.glsl").unwrap();
     program.set_attrib("position", 3, 3, 0).unwrap();
     program.bind();
@@ -134,7 +134,7 @@ fn main() {
                 }
                 buf_change += buf_change_dir * 0.001;
                 let data: Vec<f32> = data.iter().map(|x| x * buf_change).collect();
-                buffer.set_data(&data, gl::DYNAMIC_DRAW);
+                buffer.set_data(&data);
                 unsafe {
                     gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT);
                     gl::DrawArrays(gl::TRIANGLES, 0, (data.len() / 3) as i32);
