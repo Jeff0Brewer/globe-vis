@@ -3,7 +3,7 @@ extern crate glutin;
 mod gl_wrap;
 mod icosphere;
 use gl_wrap::{Bind, Buffer, Drop, Program};
-use glam::{Mat4, Vec3};
+use glam::{Mat4, Quat, Vec3};
 use glutin::dpi::{LogicalSize, PhysicalPosition};
 use glutin::event::{ElementState, Event, MouseButton, WindowEvent};
 use glutin::event_loop::{ControlFlow, EventLoop};
@@ -78,10 +78,11 @@ fn main() {
             Event::WindowEvent { event, .. } => match event {
                 WindowEvent::CursorMoved { position, .. } => {
                     if let ElementState::Pressed = drag_state {
-                        let dx = position.x - mouse_pos.x;
-                        let dy = position.y - mouse_pos.y;
-                        let rotation = rotation_from_mouse(dx, dy);
-                        model_matrix = model_matrix.mul_mat4(&rotation);
+                        model_matrix = rotate_from_mouse(
+                            model_matrix,
+                            position.x - mouse_pos.x,
+                            position.y - mouse_pos.y,
+                        );
                         ctx.window().request_redraw();
                     }
                     mouse_pos = PhysicalPosition {
@@ -112,11 +113,19 @@ fn main() {
     });
 }
 
-fn rotation_from_mouse(dx: f64, dy: f64) -> Mat4 {
-    let rotation_speed = 0.1;
-    let x_rad = (-dy * rotation_speed) as f32;
-    let x_rotation = Mat4::from_rotation_x(x_rad);
-    let z_rad = (dx * rotation_speed) as f32;
-    let z_rotation = Mat4::from_rotation_z(z_rad);
-    x_rotation.mul_mat4(&z_rotation)
+fn rotate_from_mouse(mat: Mat4, dx: f64, dy: f64) -> Mat4 {
+    let rotation_speed = 0.05;
+    let x_rad = (dy * rotation_speed) as f32;
+    let y_rad = (dx * rotation_speed) as f32;
+
+    // transform x / y axis by inverse of current rotation
+    // to get rotation axis perpendicular to current view
+    let inv_mat = mat.inverse();
+    let x_axis = inv_mat.transform_vector3(Vec3::X);
+    let y_axis = inv_mat.transform_vector3(Vec3::Y);
+
+    let x_rot = Mat4::from_quat(Quat::from_axis_angle(x_axis, x_rad));
+    let y_rot = Mat4::from_quat(Quat::from_axis_angle(y_axis, y_rad));
+
+    mat.mul_mat4(&x_rot.mul_mat4(&y_rot))
 }
