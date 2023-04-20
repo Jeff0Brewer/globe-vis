@@ -125,9 +125,28 @@ impl Program {
         result
     }
 
-    pub fn get_attrib_location(&self, attrib: &str) -> Result<u32, ProgramError> {
-        let attrib = CString::new(attrib)?;
-        unsafe { Ok(gl::GetAttribLocation(self.id, attrib.as_ptr()) as u32) }
+    pub fn set_attrib(
+        &self,
+        name: &str,
+        size: i32,
+        stride: i32,
+        offset: i32,
+    ) -> Result<(), ProgramError> {
+        let name = CString::new(name)?;
+        let fsize = std::mem::size_of::<f32>() as i32;
+        unsafe {
+            let location = gl::GetAttribLocation(self.id, name.as_ptr()) as u32;
+            gl::VertexAttribPointer(
+                location,
+                size,
+                gl::FLOAT,
+                gl::FALSE,
+                stride * fsize,
+                (offset * fsize) as *const _,
+            );
+            gl::EnableVertexAttribArray(location);
+        }
+        Ok(())
     }
 }
 

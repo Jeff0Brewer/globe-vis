@@ -2,7 +2,7 @@ extern crate gl;
 extern crate glutin;
 mod gl_wrap;
 mod icosphere;
-use gl_wrap::{Bind, Buffer, Drop, Program, VertexArray};
+use gl_wrap::{Bind, Buffer, Drop, Program};
 use glam::{Mat4, Vec3};
 use glutin::dpi::LogicalSize;
 use glutin::event::{Event, WindowEvent};
@@ -39,20 +39,7 @@ fn main() {
     let program = Program::new_from_files("./shaders/vert.glsl", "./shaders/frag.glsl").unwrap();
     let data = get_icosphere(4);
     let buffer = Buffer::new(&data, gl::STATIC_DRAW);
-    let pos_loc = program.get_attrib_location("position").unwrap();
-    let fsize = std::mem::size_of::<f32>() as i32;
-    let off: i32 = 0;
-    unsafe {
-        gl::VertexAttribPointer(
-            pos_loc,
-            3,
-            gl::FLOAT,
-            gl::FALSE,
-            3 * fsize,
-            (off * fsize) as *const _,
-        );
-        gl::EnableVertexAttribArray(pos_loc);
-    }
+    program.set_attrib("position", 3, 3, 0).unwrap();
     program.bind();
     buffer.bind();
 
