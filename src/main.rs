@@ -5,7 +5,7 @@ mod icosphere;
 use gl_wrap::{Bind, Buffer, Drop, Program};
 use glam::{Mat4, Vec3};
 use glutin::dpi::LogicalSize;
-use glutin::event::{Event, WindowEvent};
+use glutin::event::{ElementState, Event, MouseButton, WindowEvent};
 use glutin::event_loop::{ControlFlow, EventLoop};
 use glutin::window::WindowBuilder;
 use glutin::{ContextBuilder, GlRequest};
@@ -36,9 +36,9 @@ fn main() {
     }
 
     // init gl resources
-    let program = Program::new_from_files("./shaders/vert.glsl", "./shaders/frag.glsl").unwrap();
     let data = get_icosphere(4);
     let buffer = Buffer::new(&data, gl::STATIC_DRAW);
+    let program = Program::new_from_files("./shaders/vert.glsl", "./shaders/frag.glsl").unwrap();
     program.set_attrib("position", 3, 3, 0).unwrap();
     program.bind();
     buffer.bind();
@@ -59,11 +59,21 @@ fn main() {
     }
 
     // begin draw loop
-    ctx.swap_buffers().unwrap();
+    let mut drag_state = ElementState::Released;
     event_loop.run(move |event, _, control_flow| {
         *control_flow = ControlFlow::Wait;
         match event {
             Event::WindowEvent { event, .. } => match event {
+                WindowEvent::CursorMoved { position, .. } => {
+                    if let ElementState::Pressed = drag_state {
+                        println!("{} {}", position.x, position.y);
+                    }
+                }
+                WindowEvent::MouseInput {
+                    button: MouseButton::Left,
+                    state,
+                    ..
+                } => drag_state = state,
                 WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
                 _ => (),
             },
