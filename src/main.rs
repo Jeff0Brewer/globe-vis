@@ -5,7 +5,7 @@ mod icosphere;
 use gl_wrap::{Bind, Buffer, Drop, Program};
 use glam::{Mat4, Quat, Vec3};
 use glutin::dpi::{LogicalSize, PhysicalPosition};
-use glutin::event::{ElementState, Event, MouseButton, WindowEvent};
+use glutin::event::{ElementState, Event, MouseButton, MouseScrollDelta, WindowEvent};
 use glutin::event_loop::{ControlFlow, EventLoop};
 use glutin::window::WindowBuilder;
 use glutin::{ContextBuilder, GlRequest};
@@ -43,30 +43,32 @@ fn main() {
     program.bind();
     buffer.bind();
 
-    // init mvp uniform
-    let view_mat = Mat4::look_at_rh(Vec3::new(0.0, 0.0, 2.0), Vec3::ZERO, Vec3::Y);
+    // init matrix uniforms
+    let proj_name = CString::new("projMatrix").unwrap();
     let proj_mat = Mat4::perspective_rh_gl(
         70.0 * std::f32::consts::PI / 180.0,
         width / height,
         0.01,
         10.0,
     );
-    let view_proj_mat = proj_mat.mul_mat4(&view_mat);
-    let view_proj_name = CString::new("viewProjMatrix").unwrap();
-    let mut model_matrix = Mat4::IDENTITY;
+
+    let view_name = CString::new("viewMatrix").unwrap();
+    let mut view_mat = Mat4::look_at_rh(Vec3::new(0.0, 0.0, 2.0), Vec3::ZERO, Vec3::Y);
+    let view_loc;
+
     let model_name = CString::new("modelMatrix").unwrap();
+    let mut model_mat = Mat4::IDENTITY;
     let model_loc;
+
     unsafe {
-        // get model location for updates while drawing
+        let proj_loc = gl::GetUniformLocation(program.id, proj_name.as_ptr());
+        gl::UniformMatrix4fv(proj_loc, 1, gl::FALSE, &proj_mat.to_cols_array()[0]);
+
+        view_loc = gl::GetUniformLocation(program.id, view_name.as_ptr());
+        gl::UniformMatrix4fv(view_loc, 1, gl::FALSE, &view_mat.to_cols_array()[0]);
+
         model_loc = gl::GetUniformLocation(program.id, model_name.as_ptr());
-        // set static view proj mat once
-        let view_proj_loc = gl::GetUniformLocation(program.id, view_proj_name.as_ptr());
-        gl::UniformMatrix4fv(
-            view_proj_loc,
-            1,
-            gl::FALSE,
-            &view_proj_mat.to_cols_array()[0],
-        );
+        gl::UniformMatrix4fv(model_loc, 1, gl::FALSE, &model_mat.to_cols_array()[0]);
     }
 
     // begin draw loop
@@ -78,17 +80,36 @@ fn main() {
             Event::WindowEvent { event, .. } => match event {
                 WindowEvent::CursorMoved { position, .. } => {
                     if let ElementState::Pressed = drag_state {
-                        model_matrix = rotate_from_mouse(
-                            model_matrix,
+                        model_mat = rotate_from_mouse(
+                            model_mat,
                             position.x - mouse_pos.x,
                             position.y - mouse_pos.y,
                         );
+                        unsafe {
+                            gl::UniformMatrix4fv(
+                                model_loc,
+                                1,
+                                gl::FALSE,
+                                &model_mat.to_cols_array()[0],
+                            );
+                        }
                         ctx.window().request_redraw();
                     }
                     mouse_pos = PhysicalPosition {
                         x: position.x,
                         y: position.y,
                     };
+                }
+                WindowEvent::MouseWheel { delta, .. } => {
+                    let ds = match delta {
+                        MouseScrollDelta::PixelDelta(position) => position.y,
+                        MouseScrollDelta::LineDelta(_, y) => y as f64,
+                    };
+                    view_mat = zoom_from_scroll(view_mat, ds);
+                    unsafe {
+                        gl::UniformMatrix4fv(view_loc, 1, gl::FALSE, &view_mat.to_cols_array()[0]);
+                    }
+                    ctx.window().request_redraw();
                 }
                 WindowEvent::MouseInput {
                     button: MouseButton::Left,
@@ -104,7 +125,6 @@ fn main() {
             }
             Event::RedrawRequested(_) => unsafe {
                 gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT);
-                gl::UniformMatrix4fv(model_loc, 1, gl::FALSE, &model_matrix.to_cols_array()[0]);
                 gl::DrawArrays(gl::TRIANGLES, 0, (data.len() / 3) as i32);
                 ctx.swap_buffers().unwrap();
             },
@@ -128,4 +148,10 @@ fn rotate_from_mouse(mat: Mat4, dx: f64, dy: f64) -> Mat4 {
     let y_rot = Mat4::from_quat(Quat::from_axis_angle(y_axis, y_rad));
 
     mat.mul_mat4(&x_rot.mul_mat4(&y_rot))
+}
+
+fn zoom_from_scroll(mat: Mat4, delta: f64) -> Mat4 {
+    let zoom = (delta * 0.03) as f32;
+    let scale = Mat4::from_scale(Vec3::splat(1.0 + zoom));
+    mat.mul_mat4(&scale)
 }
