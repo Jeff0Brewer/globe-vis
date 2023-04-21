@@ -36,35 +36,55 @@ impl UniformMatrix {
     }
 }
 
+struct MvpMatrices {
+    pub proj: UniformMatrix,
+    pub view: UniformMatrix,
+    pub model: UniformMatrix,
+}
+
+struct Mouse {
+    x: f64,
+    y: f64,
+    dragging: bool,
+}
+
+impl Mouse {
+    pub fn new() -> Self {
+        Mouse {
+            x: 0.0,
+            y: 0.0,
+            dragging: false,
+        }
+    }
+}
+
 struct Globe {
     pub ctx: ContextWrapper<PossiblyCurrent, Window>,
     pub event_loop: EventLoop<()>,
+    pub data: Vec<f32>,
     pub program: Program,
     pub buffer: Buffer,
-    pub data: Vec<f32>,
-    pub view_mat: UniformMatrix,
-    pub proj_mat: UniformMatrix,
-    pub model_mat: UniformMatrix,
+    pub mvp: MvpMatrices,
+    pub mouse: Mouse,
 }
 
 impl Globe {
     pub fn new(width: f64, height: f64) -> Self {
-        let (ctx, event_loop) = Globe::get_ctx(width, height);
-        let (program, buffer, data, proj_mat, view_mat, model_mat) =
-            Globe::get_resources((width / height) as f32);
+        let (ctx, event_loop) = Globe::init_ctx(width, height);
+        let (program, buffer, data, mvp) = Globe::init_resources((width / height) as f32);
+        let mouse = Mouse::new();
         Self {
             ctx,
             event_loop,
             program,
             buffer,
             data,
-            view_mat,
-            proj_mat,
-            model_mat,
+            mvp,
+            mouse,
         }
     }
 
-    fn get_ctx(
+    fn init_ctx(
         width: f64,
         height: f64,
     ) -> (ContextWrapper<PossiblyCurrent, Window>, EventLoop<()>) {
@@ -89,80 +109,96 @@ impl Globe {
         (ctx, event_loop)
     }
 
-    fn get_resources(
-        aspect: f32,
-    ) -> (
-        Program,
-        Buffer,
-        Vec<f32>,
-        UniformMatrix,
-        UniformMatrix,
-        UniformMatrix,
-    ) {
+    fn init_resources(aspect: f32) -> (Program, Buffer, Vec<f32>, MvpMatrices) {
         let data = get_icosphere(4);
         let buffer = Buffer::new(&data, gl::DYNAMIC_DRAW);
         let program =
             Program::new_from_files("./shaders/vert.glsl", "./shaders/frag.glsl").unwrap();
-        let proj_mat = UniformMatrix::new(
-            &program,
-            "projMatrix",
-            Mat4::perspective_rh_gl(70.0 * std::f32::consts::PI / 180.0, aspect, 0.01, 10.0),
-        );
-        let view_mat = UniformMatrix::new(
-            &program,
-            "viewMatrix",
-            Mat4::look_at_rh(Vec3::new(0.0, 0.0, 2.0), Vec3::ZERO, Vec3::Y),
-        );
-        let model_mat = UniformMatrix::new(&program, "modelMatrix", Mat4::IDENTITY);
-        (program, buffer, data, proj_mat, view_mat, model_mat)
+        let mvp = MvpMatrices {
+            proj: UniformMatrix::new(
+                &program,
+                "projMatrix",
+                Mat4::perspective_rh_gl(70.0 * std::f32::consts::PI / 180.0, aspect, 0.01, 10.0),
+            ),
+            view: UniformMatrix::new(
+                &program,
+                "viewMatrix",
+                Mat4::look_at_rh(Vec3::new(0.0, 0.0, 2.0), Vec3::ZERO, Vec3::Y),
+            ),
+            model: UniformMatrix::new(&program, "modelMatrix", Mat4::IDENTITY),
+        };
+        (program, buffer, data, mvp)
+    }
+
+    fn mouse_move(mouse: &mut Mouse, matrix: &mut UniformMatrix, position: PhysicalPosition<f64>) {
+        if mouse.dragging {
+            matrix.data =
+                rotate_from_mouse(matrix.data, position.x - mouse.x, position.y - mouse.y);
+            matrix.apply();
+        }
+        mouse.x = position.x;
+        mouse.y = position.y;
+    }
+
+    fn mouse_input(mouse: &mut Mouse, button: MouseButton, state: ElementState) {
+        if let MouseButton::Left = button {
+            mouse.dragging = match state {
+                ElementState::Pressed => true,
+                ElementState::Released => false,
+            }
+        }
+    }
+
+    fn mouse_wheel(matrix: &mut UniformMatrix, delta: MouseScrollDelta) {
+        let ds = match delta {
+            MouseScrollDelta::PixelDelta(position) => position.y,
+            MouseScrollDelta::LineDelta(_, y) => y as f64,
+        };
+        matrix.data = zoom_from_scroll(matrix.data, ds);
+        matrix.apply();
+    }
+
+    fn get_draw() -> impl FnMut(&mut Vec<f32>, &mut Buffer) {
+        let mut buf_change = 1.0;
+        let mut buf_change_dir = 1.0;
+        move |data: &mut Vec<f32>, buffer: &mut Buffer| {
+            if !(0.5..1.0).contains(&buf_change) {
+                buf_change_dir = -buf_change_dir;
+            }
+            buf_change += buf_change_dir * 0.001;
+            let data: Vec<f32> = data.iter().map(|x| x * buf_change).collect();
+            buffer.set_data(&data);
+            unsafe {
+                gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT);
+                gl::DrawArrays(gl::TRIANGLES, 0, (data.len() / 3) as i32);
+            }
+        }
     }
 
     pub fn run(mut self) {
-        let mut buf_change = 1.0;
-        let mut buf_change_dir = 1.0;
-        let mut drag_state = ElementState::Released;
-        let mut mouse_pos = PhysicalPosition { x: 0.0, y: 0.0 };
-
-        set_attrib(&self.program, "position", 3, 3, 0).unwrap();
         self.program.bind();
         self.buffer.bind();
-        self.proj_mat.apply();
-        self.view_mat.apply();
-        self.model_mat.apply();
+        set_attrib(&self.program, "position", 3, 3, 0).unwrap();
+
+        self.mvp.proj.apply();
+        self.mvp.view.apply();
+        self.mvp.model.apply();
+
+        let mut draw = Globe::get_draw();
 
         self.event_loop.run(move |event, _, control_flow| {
             *control_flow = ControlFlow::Wait;
             match event {
                 Event::WindowEvent { event, .. } => match event {
                     WindowEvent::CursorMoved { position, .. } => {
-                        if let ElementState::Pressed = drag_state {
-                            self.model_mat.data = rotate_from_mouse(
-                                self.model_mat.data,
-                                position.x - mouse_pos.x,
-                                position.y - mouse_pos.y,
-                            );
-                            self.model_mat.apply();
-                            self.ctx.window().request_redraw();
-                        }
-                        mouse_pos = PhysicalPosition {
-                            x: position.x,
-                            y: position.y,
-                        };
+                        Globe::mouse_move(&mut self.mouse, &mut self.mvp.model, position);
                     }
                     WindowEvent::MouseWheel { delta, .. } => {
-                        let ds = match delta {
-                            MouseScrollDelta::PixelDelta(position) => position.y,
-                            MouseScrollDelta::LineDelta(_, y) => y as f64,
-                        };
-                        self.view_mat.data = zoom_from_scroll(self.view_mat.data, ds);
-                        self.view_mat.apply();
-                        self.ctx.window().request_redraw();
+                        Globe::mouse_wheel(&mut self.mvp.view, delta);
                     }
-                    WindowEvent::MouseInput {
-                        button: MouseButton::Left,
-                        state,
-                        ..
-                    } => drag_state = state,
+                    WindowEvent::MouseInput { button, state, .. } => {
+                        Globe::mouse_input(&mut self.mouse, button, state);
+                    }
                     WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
                     _ => (),
                 },
@@ -171,16 +207,7 @@ impl Globe {
                     self.buffer.drop();
                 }
                 Event::RedrawRequested(_) => {
-                    if !(0.5..1.0).contains(&buf_change) {
-                        buf_change_dir = -buf_change_dir;
-                    }
-                    buf_change += buf_change_dir * 0.001;
-                    let data: Vec<f32> = self.data.iter().map(|x| x * buf_change).collect();
-                    self.buffer.set_data(&data);
-                    unsafe {
-                        gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT);
-                        gl::DrawArrays(gl::TRIANGLES, 0, (data.len() / 3) as i32);
-                    }
+                    draw(&mut self.data, &mut self.buffer);
                     self.ctx.swap_buffers().unwrap();
                     self.ctx.window().request_redraw();
                 }
