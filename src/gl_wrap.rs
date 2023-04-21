@@ -124,30 +124,6 @@ impl Program {
         // return result of default constructor
         result
     }
-
-    pub fn set_attrib(
-        &self,
-        name: &str,
-        size: i32,
-        stride: i32,
-        offset: i32,
-    ) -> Result<(), ProgramError> {
-        let name = CString::new(name)?;
-        let fsize = std::mem::size_of::<f32>() as i32;
-        unsafe {
-            let location = gl::GetAttribLocation(self.id, name.as_ptr()) as u32;
-            gl::VertexAttribPointer(
-                location,
-                size,
-                gl::FLOAT,
-                gl::FALSE,
-                stride * fsize,
-                (offset * fsize) as *const _,
-            );
-            gl::EnableVertexAttribArray(location);
-        }
-        Ok(())
-    }
 }
 
 impl Drop for Program {
@@ -210,6 +186,30 @@ impl Drop for Buffer {
             gl::DeleteBuffers(1, [self.id].as_ptr());
         }
     }
+}
+
+pub fn set_attrib(
+    program: &Program,
+    name: &str,
+    size: i32,
+    stride: i32,
+    offset: i32,
+) -> Result<(), std::ffi::NulError> {
+    let name = CString::new(name)?;
+    let fsize = std::mem::size_of::<f32>() as i32;
+    unsafe {
+        let location = gl::GetAttribLocation(program.id, name.as_ptr()) as u32;
+        gl::VertexAttribPointer(
+            location,
+            size,
+            gl::FLOAT,
+            gl::FALSE,
+            stride * fsize,
+            (offset * fsize) as *const _,
+        );
+        gl::EnableVertexAttribArray(location);
+    }
+    Ok(())
 }
 
 extern crate thiserror;
