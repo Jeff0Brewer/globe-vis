@@ -1,14 +1,14 @@
 use glam::{Mat4, Quat, Vec3};
 
-pub struct Mouse {
+pub struct MouseState {
     pub x: f64,
     pub y: f64,
     pub dragging: bool,
 }
 
-impl Mouse {
+impl MouseState {
     pub fn new() -> Self {
-        Mouse {
+        MouseState {
             x: 0.0,
             y: 0.0,
             dragging: false,
