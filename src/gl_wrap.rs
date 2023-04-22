@@ -1,16 +1,17 @@
 extern crate gl;
 extern crate glutin;
 use gl::types::GLenum;
+use glam::Mat4;
 use std::ffi::CString;
 use std::{fs, ptr};
 
+// free resources
 pub trait Drop {
-    // free resources
     fn drop(&self);
 }
 
+// set gl state
 pub trait Bind {
-    // set gl state
     fn bind(&self);
 }
 
@@ -124,30 +125,6 @@ impl Program {
         // return result of default constructor
         result
     }
-
-    pub fn set_attrib(
-        &self,
-        name: &str,
-        size: i32,
-        stride: i32,
-        offset: i32,
-    ) -> Result<(), ProgramError> {
-        let name = CString::new(name)?;
-        let fsize = std::mem::size_of::<f32>() as i32;
-        unsafe {
-            let location = gl::GetAttribLocation(self.id, name.as_ptr()) as u32;
-            gl::VertexAttribPointer(
-                location,
-                size,
-                gl::FLOAT,
-                gl::FALSE,
-                stride * fsize,
-                (offset * fsize) as *const _,
-            );
-            gl::EnableVertexAttribArray(location);
-        }
-        Ok(())
-    }
 }
 
 impl Drop for Program {
@@ -212,6 +189,52 @@ impl Drop for Buffer {
     }
 }
 
+pub struct UniformMatrix {
+    location: i32,
+    pub data: Mat4,
+}
+
+impl UniformMatrix {
+    pub fn new(program: &Program, name: &str, data: Mat4) -> Result<Self, UniformMatrixError> {
+        let name = CString::new(name).unwrap();
+        let location;
+        unsafe {
+            location = gl::GetUniformLocation(program.id, name.as_ptr());
+        }
+        Ok(Self { location, data })
+    }
+
+    pub fn apply(&self) {
+        unsafe {
+            gl::UniformMatrix4fv(self.location, 1, gl::FALSE, &self.data.to_cols_array()[0]);
+        }
+    }
+}
+
+pub fn set_attrib(
+    program: &Program,
+    name: &str,
+    size: i32,
+    stride: i32,
+    offset: i32,
+) -> Result<(), std::ffi::NulError> {
+    let name = CString::new(name)?;
+    let fsize = std::mem::size_of::<f32>() as i32;
+    unsafe {
+        let location = gl::GetAttribLocation(program.id, name.as_ptr()) as u32;
+        gl::VertexAttribPointer(
+            location,
+            size,
+            gl::FLOAT,
+            gl::FALSE,
+            stride * fsize,
+            (offset * fsize) as *const _,
+        );
+        gl::EnableVertexAttribArray(location);
+    }
+    Ok(())
+}
+
 extern crate thiserror;
 use thiserror::Error;
 
@@ -231,10 +254,16 @@ pub enum ShaderError {
 pub enum ProgramError {
     #[error("Linking error: {0}")]
     Linking(String),
-    #[error{"{0}"}]
+    #[error("{0}")]
     Utf8(#[from] std::string::FromUtf8Error),
-    #[error{"{0}"}]
+    #[error("{0}")]
     Nul(#[from] std::ffi::NulError),
-    #[error{"{0}"}]
+    #[error("{0}")]
     Shader(#[from] ShaderError),
+}
+
+#[derive(Error, Debug)]
+pub enum UniformMatrixError {
+    #[error("{0}")]
+    Nul(#[from] std::ffi::NulError),
 }
