@@ -260,12 +260,24 @@ impl Drop for VisGl {
     }
 }
 
-fn run_visualization(width: f64, height: f64) {
-    let window = VisWindow::new(width, height);
-    let gl = VisGl::new(width, height);
-    VisWindow::run(window, gl);
+struct Vis {
+    gl: VisGl,
+    window: VisWindow,
+}
+
+impl Vis {
+    pub fn new(width: f64, height: f64) -> Self {
+        let window = VisWindow::new(width, height);
+        let gl = VisGl::new(width, height);
+        Self { gl, window }
+    }
+
+    pub fn start(vis: Vis) {
+        VisWindow::run(vis.window, vis.gl);
+    }
 }
 
 fn main() {
-    run_visualization(500.0, 500.0);
+    let vis = Vis::new(500.0, 500.0);
+    Vis::start(vis);
 }
