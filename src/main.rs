@@ -117,7 +117,6 @@ impl Globe {
             let data: Vec<f32> = globe.data.iter().map(|x| x * buf_change).collect();
             globe.buffer.set_data(&data);
             unsafe {
-                gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT);
                 gl::DrawArrays(gl::TRIANGLES, 0, (data.len() / 3) as i32);
             }
         }
@@ -229,8 +228,10 @@ impl Vis {
                         self.globe.drop();
                     }
                     Event::RedrawRequested(_) => {
+                        unsafe {
+                            gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT);
+                        }
                         globe_draw(&mut self.globe);
-
                         self.gl_window.ctx.swap_buffers().unwrap();
                         self.gl_window.ctx.window().request_redraw();
                     }
