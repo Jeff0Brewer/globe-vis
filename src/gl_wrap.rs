@@ -5,13 +5,13 @@ use glam::Mat4;
 use std::ffi::CString;
 use std::{fs, ptr};
 
+// free resources
 pub trait Drop {
-    // free resources
     fn drop(&self);
 }
 
+// set gl state
 pub trait Bind {
-    // set gl state
     fn bind(&self);
 }
 
@@ -189,6 +189,28 @@ impl Drop for Buffer {
     }
 }
 
+pub struct UniformMatrix {
+    location: i32,
+    pub data: Mat4,
+}
+
+impl UniformMatrix {
+    pub fn new(program: &Program, name: &str, data: Mat4) -> Result<Self, UniformMatrixError> {
+        let name = CString::new(name).unwrap();
+        let location;
+        unsafe {
+            location = gl::GetUniformLocation(program.id, name.as_ptr());
+        }
+        Ok(Self { location, data })
+    }
+
+    pub fn apply(&self) {
+        unsafe {
+            gl::UniformMatrix4fv(self.location, 1, gl::FALSE, &self.data.to_cols_array()[0]);
+        }
+    }
+}
+
 pub fn set_attrib(
     program: &Program,
     name: &str,
@@ -211,28 +233,6 @@ pub fn set_attrib(
         gl::EnableVertexAttribArray(location);
     }
     Ok(())
-}
-
-pub struct UniformMatrix {
-    location: i32,
-    pub data: Mat4,
-}
-
-impl UniformMatrix {
-    pub fn new(program: &Program, name: &str, data: Mat4) -> Result<Self, UniformMatrixError> {
-        let name = CString::new(name).unwrap();
-        let location;
-        unsafe {
-            location = gl::GetUniformLocation(program.id, name.as_ptr());
-        }
-        Ok(Self { location, data })
-    }
-
-    pub fn apply(&self) {
-        unsafe {
-            gl::UniformMatrix4fv(self.location, 1, gl::FALSE, &self.data.to_cols_array()[0]);
-        }
-    }
 }
 
 extern crate thiserror;
