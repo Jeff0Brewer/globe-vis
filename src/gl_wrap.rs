@@ -254,16 +254,16 @@ pub enum ShaderError {
 pub enum ProgramError {
     #[error("Linking error: {0}")]
     Linking(String),
-    #[error{"{0}"}]
+    #[error("{0}")]
     Utf8(#[from] std::string::FromUtf8Error),
-    #[error{"{0}"}]
+    #[error("{0}")]
     Nul(#[from] std::ffi::NulError),
-    #[error{"{0}"}]
+    #[error("{0}")]
     Shader(#[from] ShaderError),
 }
 
 #[derive(Error, Debug)]
 pub enum UniformMatrixError {
-    #[error{"{0}"}]
+    #[error("{0}")]
     Nul(#[from] std::ffi::NulError),
 }
