@@ -12,6 +12,7 @@ use glutin::window::{Window, WindowBuilder};
 use glutin::{ContextBuilder, ContextWrapper, GlRequest, PossiblyCurrent};
 use icosphere::get_icosphere;
 use mouse::{rotate_from_mouse, zoom_from_scroll};
+use std::f32::consts::PI;
 use std::ffi::CString;
 
 struct UniformMatrix {
@@ -40,6 +41,24 @@ struct MvpMatrices {
     pub proj: UniformMatrix,
     pub view: UniformMatrix,
     pub model: UniformMatrix,
+}
+
+impl MvpMatrices {
+    pub fn new(program: &Program, fov: f32, aspect: f32, camera: Vec3) -> Self {
+        Self {
+            proj: UniformMatrix::new(
+                program,
+                "projMatrix",
+                Mat4::perspective_rh_gl(fov, aspect, 0.1, 10.0),
+            ),
+            view: UniformMatrix::new(
+                program,
+                "viewMatrix",
+                Mat4::look_at_rh(camera, Vec3::ZERO, Vec3::Y),
+            ),
+            model: UniformMatrix::new(program, "modelMatrix", Mat4::IDENTITY),
+        }
+    }
 }
 
 struct Mouse {
@@ -141,29 +160,18 @@ impl Vis {
     pub fn new(width: f64, height: f64) -> Self {
         let gl_window = GlWindow::new(width, height);
         let globe = Globe::new();
-        let mvp = Vis::init_mvp((width / height) as f32, &globe.program);
+        let mvp = MvpMatrices::new(
+            &globe.program,
+            70.0 * PI / 180.0,
+            (width / height) as f32,
+            Vec3::new(2.0, 0.0, 0.0),
+        );
         let mouse = Mouse::new();
         Self {
             gl_window,
             globe,
             mvp,
             mouse,
-        }
-    }
-
-    fn init_mvp(aspect: f32, program: &Program) -> MvpMatrices {
-        MvpMatrices {
-            proj: UniformMatrix::new(
-                program,
-                "projMatrix",
-                Mat4::perspective_rh_gl(70.0 * std::f32::consts::PI / 180.0, aspect, 0.01, 10.0),
-            ),
-            view: UniformMatrix::new(
-                program,
-                "viewMatrix",
-                Mat4::look_at_rh(Vec3::new(0.0, 0.0, 2.0), Vec3::ZERO, Vec3::Y),
-            ),
-            model: UniformMatrix::new(program, "modelMatrix", Mat4::IDENTITY),
         }
     }
 
