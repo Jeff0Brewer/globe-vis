@@ -1,6 +1,7 @@
 use crate::gl_wrap::{Buffer, Drop, Program};
 use crate::icosphere::get_icosphere;
 
+// contains gl resources / logic for drawing globe
 pub struct Globe {
     pub data: Vec<f32>,
     pub program: Program,
@@ -19,7 +20,9 @@ impl Globe {
         })
     }
 
+    // get draw function as closure for flexibility
     pub fn get_draw() -> impl FnMut(&mut Globe) {
+        // temp update to buffer for testing
         let mut buf_change = 1.0;
         let mut buf_change_dir = 1.0;
         move |globe: &mut Globe| {
