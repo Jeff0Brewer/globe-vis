@@ -8,16 +8,15 @@ pub struct Globe {
 }
 
 impl Globe {
-    pub fn new() -> Self {
+    pub fn new() -> Result<Self, GlobeError> {
         let data = get_icosphere(4);
         let buffer = Buffer::new(&data, gl::DYNAMIC_DRAW);
-        let program =
-            Program::new_from_files("./shaders/vert.glsl", "./shaders/frag.glsl").unwrap();
-        Self {
+        let program = Program::new_from_files("./shaders/vert.glsl", "./shaders/frag.glsl")?;
+        Ok(Self {
             program,
             buffer,
             data,
-        }
+        })
     }
 
     pub fn get_draw() -> impl FnMut(&mut Globe) {
@@ -42,4 +41,11 @@ impl Drop for Globe {
         self.program.drop();
         self.buffer.drop();
     }
+}
+
+use thiserror::Error;
+#[derive(Error, Debug)]
+pub enum GlobeError {
+    #[error("{0}")]
+    Program(#[from] crate::gl_wrap::ProgramError),
 }
