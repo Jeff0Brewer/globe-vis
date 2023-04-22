@@ -1,5 +1,21 @@
 use glam::{Mat4, Quat, Vec3};
 
+pub struct Mouse {
+    pub x: f64,
+    pub y: f64,
+    pub dragging: bool,
+}
+
+impl Mouse {
+    pub fn new() -> Self {
+        Mouse {
+            x: 0.0,
+            y: 0.0,
+            dragging: false,
+        }
+    }
+}
+
 const ROT_SPEED: f64 = 0.05;
 const ZOOM_SPEED: f64 = 0.03;
 

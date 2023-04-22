@@ -1,6 +1,7 @@
 extern crate gl;
 extern crate glutin;
 use gl::types::GLenum;
+use glam::Mat4;
 use std::ffi::CString;
 use std::{fs, ptr};
 
@@ -212,6 +213,28 @@ pub fn set_attrib(
     Ok(())
 }
 
+pub struct UniformMatrix {
+    location: i32,
+    pub data: Mat4,
+}
+
+impl UniformMatrix {
+    pub fn new(program: &Program, name: &str, data: Mat4) -> Result<Self, UniformMatrixError> {
+        let name = CString::new(name).unwrap();
+        let location;
+        unsafe {
+            location = gl::GetUniformLocation(program.id, name.as_ptr());
+        }
+        Ok(Self { location, data })
+    }
+
+    pub fn apply(&self) {
+        unsafe {
+            gl::UniformMatrix4fv(self.location, 1, gl::FALSE, &self.data.to_cols_array()[0]);
+        }
+    }
+}
+
 extern crate thiserror;
 use thiserror::Error;
 
@@ -237,4 +260,10 @@ pub enum ProgramError {
     Nul(#[from] std::ffi::NulError),
     #[error{"{0}"}]
     Shader(#[from] ShaderError),
+}
+
+#[derive(Error, Debug)]
+pub enum UniformMatrixError {
+    #[error{"{0}"}]
+    Nul(#[from] std::ffi::NulError),
 }
