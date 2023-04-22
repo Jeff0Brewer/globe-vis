@@ -8,6 +8,6 @@ mod vis;
 use vis::Vis;
 
 fn main() {
-    let vis = Vis::new(500.0, 500.0);
-    Vis::start(vis);
+    let vis = Vis::new(500.0, 500.0).unwrap();
+    Vis::start(vis).unwrap();
 }

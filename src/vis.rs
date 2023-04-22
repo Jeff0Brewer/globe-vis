@@ -16,77 +16,15 @@ pub struct Vis {
 }
 
 impl Vis {
-    pub fn new(width: f64, height: f64) -> Self {
-        let window = VisWindow::new(width, height);
-        let gl = VisGl::new(width, height);
-        Self { gl, window }
+    pub fn new(width: f64, height: f64) -> Result<Self, VisError> {
+        let window = VisWindow::new(width, height)?;
+        let gl = VisGl::new(width, height)?;
+        Ok(Self { gl, window })
     }
 
-    pub fn start(vis: Vis) {
-        VisWindow::run(vis.window, vis.gl);
-    }
-}
-
-struct VisWindow {
-    pub ctx: ContextWrapper<PossiblyCurrent, Window>,
-    pub event_loop: EventLoop<()>,
-}
-
-impl VisWindow {
-    pub fn new(width: f64, height: f64) -> Self {
-        let window = WindowBuilder::new()
-            .with_inner_size(LogicalSize::new(width, height))
-            .with_title("window");
-        let event_loop = EventLoop::new();
-        let ctx_builder = ContextBuilder::new()
-            .with_gl(GlRequest::GlThenGles {
-                // version 2.0 for WebGL compatibility
-                opengl_version: (2, 0),
-                opengles_version: (2, 0),
-            })
-            .with_multisampling(4)
-            .build_windowed(window, &event_loop);
-        let ctx;
-        unsafe {
-            ctx = ctx_builder.unwrap().make_current().unwrap();
-            gl::load_with(|ptr| ctx.get_proc_address(ptr) as *const _);
-            gl::Enable(gl::DEPTH_TEST);
-        }
-        Self { ctx, event_loop }
-    }
-
-    pub fn run(window: VisWindow, mut vis: VisGl) {
-        vis.setup();
-
-        let mut draw = VisGl::get_draw();
-
-        window.event_loop.run(move |event, _, control_flow| {
-            *control_flow = ControlFlow::Wait;
-            match event {
-                Event::WindowEvent { event, .. } => match event {
-                    WindowEvent::CursorMoved { position, .. } => {
-                        vis.mouse_move(position);
-                    }
-                    WindowEvent::MouseWheel { delta, .. } => {
-                        vis.mouse_wheel(delta);
-                    }
-                    WindowEvent::MouseInput { button, state, .. } => {
-                        vis.mouse_input(button, state);
-                    }
-                    WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
-                    _ => (),
-                },
-                Event::LoopDestroyed => {
-                    vis.drop();
-                }
-                Event::RedrawRequested(_) => {
-                    draw(&mut vis);
-                    window.ctx.swap_buffers().unwrap();
-                    window.ctx.window().request_redraw();
-                }
-                _ => (),
-            }
-        });
+    pub fn start(vis: Vis) -> Result<(), VisError> {
+        VisWindow::run(vis.window, vis.gl)?;
+        Ok(())
     }
 }
 
@@ -97,11 +35,11 @@ struct VisGl {
 }
 
 impl VisGl {
-    pub fn new(width: f64, height: f64) -> Self {
+    pub fn new(width: f64, height: f64) -> Result<Self, VisError> {
         let mouse = Mouse::new();
-        let globe = Globe::new();
-        let mvp = MvpMatrices::new(&globe.program, (width / height) as f32).unwrap();
-        Self { globe, mvp, mouse }
+        let globe = Globe::new()?;
+        let mvp = MvpMatrices::new(&globe.program, (width / height) as f32)?;
+        Ok(Self { globe, mvp, mouse })
     }
 
     fn mouse_move(&mut self, position: PhysicalPosition<f64>) {
@@ -145,20 +83,83 @@ impl VisGl {
         }
     }
 
-    pub fn setup(&self) {
+    pub fn setup(&self) -> Result<(), VisError> {
         self.globe.program.bind();
         self.globe.buffer.bind();
-        set_attrib(&self.globe.program, "position", 3, 3, 0).unwrap();
+        set_attrib(&self.globe.program, "position", 3, 3, 0)?;
 
         self.mvp.proj.apply();
         self.mvp.view.apply();
         self.mvp.model.apply();
+        Ok(())
     }
 }
 
 impl Drop for VisGl {
     fn drop(&self) {
         self.globe.drop();
+    }
+}
+
+struct VisWindow {
+    pub ctx: ContextWrapper<PossiblyCurrent, Window>,
+    pub event_loop: EventLoop<()>,
+}
+
+impl VisWindow {
+    pub fn new(width: f64, height: f64) -> Result<Self, VisError> {
+        let window = WindowBuilder::new()
+            .with_inner_size(LogicalSize::new(width, height))
+            .with_title("window");
+        let event_loop = EventLoop::new();
+        let ctx_builder = ContextBuilder::new()
+            .with_gl(GlRequest::GlThenGles {
+                // version 2.0 for WebGL compatibility
+                opengl_version: (2, 0),
+                opengles_version: (2, 0),
+            })
+            .with_multisampling(4)
+            .build_windowed(window, &event_loop)?;
+        let ctx;
+        unsafe {
+            ctx = ctx_builder.make_current().unwrap();
+            gl::load_with(|ptr| ctx.get_proc_address(ptr) as *const _);
+            gl::Enable(gl::DEPTH_TEST);
+        }
+        Ok(Self { ctx, event_loop })
+    }
+
+    pub fn run(window: VisWindow, mut vis: VisGl) -> Result<(), VisError> {
+        vis.setup()?;
+        let mut draw = VisGl::get_draw();
+
+        window.event_loop.run(move |event, _, control_flow| {
+            *control_flow = ControlFlow::Wait;
+            match event {
+                Event::WindowEvent { event, .. } => match event {
+                    WindowEvent::CursorMoved { position, .. } => {
+                        vis.mouse_move(position);
+                    }
+                    WindowEvent::MouseWheel { delta, .. } => {
+                        vis.mouse_wheel(delta);
+                    }
+                    WindowEvent::MouseInput { button, state, .. } => {
+                        vis.mouse_input(button, state);
+                    }
+                    WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
+                    _ => (),
+                },
+                Event::LoopDestroyed => {
+                    vis.drop();
+                }
+                Event::RedrawRequested(_) => {
+                    draw(&mut vis);
+                    window.ctx.swap_buffers().unwrap();
+                    window.ctx.window().request_redraw();
+                }
+                _ => (),
+            }
+        });
     }
 }
 
@@ -186,6 +187,18 @@ impl MvpMatrices {
 }
 
 use thiserror::Error;
+
+#[derive(Error, Debug)]
+pub enum VisError {
+    #[error("{0}")]
+    Mvp(#[from] MvpError),
+    #[error("{0}")]
+    Globe(#[from] crate::globe::GlobeError),
+    #[error("{0}")]
+    Nul(#[from] std::ffi::NulError),
+    #[error("{0}")]
+    CtxCreation(#[from] glutin::CreationError),
+}
 
 #[derive(Error, Debug)]
 pub enum MvpError {
