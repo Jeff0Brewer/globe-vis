@@ -164,7 +164,7 @@ impl Vis {
             &globe.program,
             70.0 * PI / 180.0,
             (width / height) as f32,
-            Vec3::new(2.0, 0.0, 0.0),
+            Vec3::new(0.0, 0.0, 2.0),
         );
         let mouse = Mouse::new();
         Self {
