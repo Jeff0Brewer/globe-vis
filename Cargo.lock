@@ -416,8 +416,21 @@ version = "0.1.0"
 dependencies = [
  "gl",
  "glam",
+ "glow",
  "glutin",
  "thiserror",
+]
+
+[[package]]
+name = "glow"
+version = "0.12.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4e007a07a24de5ecae94160f141029e9a347282cfe25d1d58d85d845cf3130f1"
+dependencies = [
+ "js-sys",
+ "slotmap",
+ "wasm-bindgen",
+ "web-sys",
 ]
 
 [[package]]

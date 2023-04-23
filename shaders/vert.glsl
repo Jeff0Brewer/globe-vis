@@ -1,8 +1,8 @@
-attribute vec4 position;
+in vec4 position;
 uniform mat4 projMatrix;
 uniform mat4 viewMatrix;
 uniform mat4 modelMatrix;
-varying vec4 testColor;
+out vec4 testColor;
 
 void main() {
     gl_Position = projMatrix * viewMatrix * modelMatrix * position;
