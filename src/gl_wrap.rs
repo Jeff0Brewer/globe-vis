@@ -211,11 +211,18 @@ pub fn set_attrib(
     unsafe {
         location = gl.get_attrib_location(program.id, name);
     }
-    let fsize = std::mem::size_of::<f32>() as i32;
     match location {
         None => Err(AttribError::Location),
         Some(location) => unsafe {
-            gl.vertex_attrib_pointer_f32(location, size, gl::FLOAT, false, fsize * stride, offset);
+            let fsize = std::mem::size_of::<f32>() as i32;
+            gl.vertex_attrib_pointer_f32(
+                location,
+                size,
+                gl::FLOAT,
+                false,
+                fsize * stride,
+                fsize * offset,
+            );
             gl.enable_vertex_attrib_array(location);
             Ok(())
         },
