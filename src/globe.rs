@@ -13,7 +13,7 @@ pub struct Globe {
 impl Globe {
     pub fn new(gl: &glow::Context, shader_version: &str) -> Result<Self, GlobeError> {
         let data = get_icosphere(4);
-        let buffer = Buffer::new(gl, &data, gl::DYNAMIC_DRAW)?;
+        let buffer = Buffer::new(gl, &data, glow::DYNAMIC_DRAW)?;
         let program = Program::new_from_files(
             gl,
             shader_version,
@@ -40,7 +40,7 @@ impl Globe {
             let data: Vec<f32> = globe.data.iter().map(|x| x * buf_change).collect();
             globe.buffer.set_data(gl, &data);
             unsafe {
-                gl.draw_arrays(gl::TRIANGLES, 0, (data.len() / 3) as i32);
+                gl.draw_arrays(glow::TRIANGLES, 0, (data.len() / 3) as i32);
             }
         }
     }

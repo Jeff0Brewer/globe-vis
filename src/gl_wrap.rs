@@ -100,8 +100,8 @@ impl Program {
         vertex_file: &str,
         fragment_file: &str,
     ) -> Result<Self, ProgramError> {
-        let vertex_shader = Shader::new(gl, version, vertex_file, gl::VERTEX_SHADER)?;
-        let fragment_shader = Shader::new(gl, version, fragment_file, gl::FRAGMENT_SHADER)?;
+        let vertex_shader = Shader::new(gl, version, vertex_file, glow::VERTEX_SHADER)?;
+        let fragment_shader = Shader::new(gl, version, fragment_file, glow::FRAGMENT_SHADER)?;
         let result = Self::new(gl, &vertex_shader, &fragment_shader);
 
         // free no longer needed shader resources after linking
@@ -149,7 +149,7 @@ impl Buffer {
         self.bind(gl);
         unsafe {
             let (_, bytes, _) = data.align_to::<u8>();
-            gl.buffer_data_u8_slice(gl::ARRAY_BUFFER, bytes, self.draw_type);
+            gl.buffer_data_u8_slice(glow::ARRAY_BUFFER, bytes, self.draw_type);
         }
     }
 }
@@ -157,7 +157,7 @@ impl Buffer {
 impl Bind for Buffer {
     fn bind(&self, gl: &glow::Context) {
         unsafe {
-            gl.bind_buffer(gl::ARRAY_BUFFER, Some(self.id));
+            gl.bind_buffer(glow::ARRAY_BUFFER, Some(self.id));
         }
     }
 }
@@ -218,7 +218,7 @@ pub fn set_attrib(
             gl.vertex_attrib_pointer_f32(
                 location,
                 size,
-                gl::FLOAT,
+                glow::FLOAT,
                 false,
                 fsize * stride,
                 fsize * offset,

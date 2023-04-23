@@ -118,9 +118,9 @@ impl Drop for VisGl {
 // contains gl context, window, event loop
 struct VisContext {
     pub gl: glow::Context,
+    pub shader_version: String,
     pub ctx: ContextWrapper<PossiblyCurrent, Window>,
     pub event_loop: EventLoop<()>,
-    pub shader_version: String,
 }
 
 impl VisContext {
@@ -145,9 +145,9 @@ impl VisContext {
         };
         Ok(Self {
             gl,
+            shader_version,
             ctx,
             event_loop,
-            shader_version,
         })
     }
 
