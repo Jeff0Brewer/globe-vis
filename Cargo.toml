@@ -6,6 +6,6 @@ edition = "2021"
 [dependencies]
 glutin = "0.29.1"
 glam = "0.22.0"
+glow = "0.12.1"
 gl = "0.14.0"
-fontdue = "0.7.2"
 thiserror = "1.0.38"
