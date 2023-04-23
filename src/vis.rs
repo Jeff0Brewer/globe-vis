@@ -1,5 +1,3 @@
-extern crate glow;
-extern crate glutin;
 use crate::gl_wrap::{set_attrib, Bind, Drop, Program, UniformMatrix};
 use crate::globe::Globe;
 use crate::mouse::{rotate_from_mouse, zoom_from_scroll, MouseState};

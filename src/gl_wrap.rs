@@ -1,5 +1,3 @@
-extern crate glow;
-extern crate glutin;
 use glam::Mat4;
 use glow::HasContext;
 use std::fs;

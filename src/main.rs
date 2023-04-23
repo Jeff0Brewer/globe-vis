@@ -1,4 +1,3 @@
-extern crate glutin;
 mod gl_wrap;
 mod globe;
 mod icosphere;

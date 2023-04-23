@@ -1,4 +1,3 @@
-extern crate glow;
 use crate::gl_wrap::{Buffer, Drop, Program};
 use crate::icosphere::get_icosphere;
 use glow::HasContext;
