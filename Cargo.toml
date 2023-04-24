@@ -4,7 +4,9 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-glutin = "0.29.1"
 glam = "0.22.0"
 glow = "0.12.1"
 thiserror = "1.0.38"
+
+[target.'cfg(not(wasm32))'.dependencies]
+glutin = "0.29.1"

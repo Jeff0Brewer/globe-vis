@@ -16,6 +16,12 @@ impl MouseState {
     }
 }
 
+pub enum MouseButton {
+    Left,
+    Right,
+    Other,
+}
+
 const ROT_SPEED: f64 = 0.05;
 const ZOOM_SPEED: f64 = 0.03;
 

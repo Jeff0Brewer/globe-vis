@@ -1,13 +1,17 @@
 use crate::gl_wrap::{set_attrib, Bind, Drop, Program, UniformMatrix};
 use crate::globe::Globe;
-use crate::mouse::{rotate_from_mouse, zoom_from_scroll, MouseState};
+use crate::mouse::{rotate_from_mouse, zoom_from_scroll, MouseButton, MouseState};
 use glam::{Mat4, Vec3};
 use glow::HasContext;
-use glutin::dpi::{LogicalSize, PhysicalPosition};
-use glutin::event::{ElementState, Event, MouseButton, MouseScrollDelta, WindowEvent};
-use glutin::event_loop::{ControlFlow, EventLoop};
-use glutin::window::{Window, WindowBuilder};
-use glutin::{ContextBuilder, ContextWrapper, PossiblyCurrent};
+mod native {
+    pub use glutin::dpi::LogicalSize;
+    pub use glutin::event::MouseButton as MouseButtonGlutin;
+    pub use glutin::event::{ElementState, Event, MouseScrollDelta, WindowEvent};
+    pub use glutin::event_loop::ControlFlow;
+    pub use glutin::event_loop::EventLoop;
+    pub use glutin::window::WindowBuilder;
+    pub use glutin::ContextBuilder;
+}
 
 // wrapper for initialization and running vis
 pub struct Vis {
@@ -46,36 +50,28 @@ impl VisGl {
         Ok(Self { globe, mvp, mouse })
     }
 
-    fn mouse_move(&mut self, gl: &glow::Context, position: PhysicalPosition<f64>) {
+    fn mouse_move(&mut self, gl: &glow::Context, x: f64, y: f64) {
         if self.mouse.dragging {
-            let dx = position.x - self.mouse.x;
-            let dy = position.y - self.mouse.y;
+            let dx = x - self.mouse.x;
+            let dy = y - self.mouse.y;
             // rotate model matrix from mouse move deltas
             self.mvp.model.data = rotate_from_mouse(self.mvp.model.data, dx, dy);
             self.mvp.model.apply(gl);
         }
         // save last mouse position
-        self.mouse.x = position.x;
-        self.mouse.y = position.y;
+        self.mouse.x = x;
+        self.mouse.y = y;
     }
 
-    fn mouse_input(&mut self, _: &glow::Context, button: MouseButton, state: ElementState) {
+    fn mouse_input(&mut self, _: &glow::Context, button: MouseButton, pressed: bool) {
         // save mouse drag state on left mouse input
         if let MouseButton::Left = button {
-            self.mouse.dragging = match state {
-                ElementState::Pressed => true,
-                ElementState::Released => false,
-            }
+            self.mouse.dragging = pressed;
         }
     }
 
-    fn mouse_wheel(&mut self, gl: &glow::Context, delta: MouseScrollDelta) {
-        let ds = match delta {
-            MouseScrollDelta::PixelDelta(position) => position.y,
-            MouseScrollDelta::LineDelta(_, y) => y as f64,
-        };
-        // zoom view matrix from mouse scroll delta
-        self.mvp.view.data = zoom_from_scroll(self.mvp.view.data, ds);
+    fn mouse_wheel(&mut self, gl: &glow::Context, delta: f64) {
+        self.mvp.view.data = zoom_from_scroll(self.mvp.view.data, delta);
         self.mvp.view.apply(gl);
     }
 
@@ -117,30 +113,28 @@ impl Drop for VisGl {
 struct VisContext {
     pub gl: glow::Context,
     pub shader_version: String,
-    pub ctx: ContextWrapper<PossiblyCurrent, Window>,
-    pub event_loop: EventLoop<()>,
+    pub ctx: glutin::ContextWrapper<glutin::PossiblyCurrent, glutin::window::Window>,
+    pub event_loop: glutin::event_loop::EventLoop<()>,
 }
 
 impl VisContext {
     pub fn new(width: f64, height: f64) -> Result<Self, VisError> {
-        let (gl, ctx, event_loop, shader_version) = {
-            let event_loop = EventLoop::new();
-            let window = WindowBuilder::new()
-                .with_inner_size(LogicalSize::new(width, height))
-                .with_title("window");
-            let ctx_builder = ContextBuilder::new()
-                .with_multisampling(4)
-                .build_windowed(window, &event_loop)?;
-            let ctx;
-            let gl;
-            unsafe {
-                ctx = ctx_builder.make_current().unwrap();
-                gl = glow::Context::from_loader_function(|x| ctx.get_proc_address(x) as *const _);
-                gl.enable(glow::DEPTH_TEST);
-            }
-            let shader_version = String::from("#version 410");
-            (gl, ctx, event_loop, shader_version)
-        };
+        use native::*;
+        let event_loop = EventLoop::new();
+        let window = WindowBuilder::new()
+            .with_inner_size(LogicalSize::new(width, height))
+            .with_title("window");
+        let ctx_builder = ContextBuilder::new()
+            .with_multisampling(4)
+            .build_windowed(window, &event_loop)?;
+        let ctx;
+        let gl;
+        unsafe {
+            ctx = ctx_builder.make_current().unwrap();
+            gl = glow::Context::from_loader_function(|x| ctx.get_proc_address(x) as *const _);
+            gl.enable(glow::DEPTH_TEST);
+        }
+        let shader_version = String::from("#version 410");
         Ok(Self {
             gl,
             shader_version,
@@ -152,6 +146,7 @@ impl VisContext {
     // window passed as argument since running event loop causes move
     // calls vis event handlers on event
     pub fn run(window: VisContext, mut vis: VisGl) -> Result<(), VisError> {
+        use native::*;
         vis.setup_gl_resources(&window.gl)?;
         let mut draw = VisGl::get_draw();
         window.event_loop.run(move |event, _, control_flow| {
@@ -159,12 +154,25 @@ impl VisContext {
             match event {
                 Event::WindowEvent { event, .. } => match event {
                     WindowEvent::CursorMoved { position, .. } => {
-                        vis.mouse_move(&window.gl, position);
+                        vis.mouse_move(&window.gl, position.x, position.y);
                     }
                     WindowEvent::MouseWheel { delta, .. } => {
-                        vis.mouse_wheel(&window.gl, delta);
+                        let ds = match delta {
+                            MouseScrollDelta::PixelDelta(position) => position.y,
+                            MouseScrollDelta::LineDelta(_, y) => y as f64,
+                        };
+                        vis.mouse_wheel(&window.gl, ds);
                     }
                     WindowEvent::MouseInput { button, state, .. } => {
+                        let button = match button {
+                            MouseButtonGlutin::Left => MouseButton::Left,
+                            MouseButtonGlutin::Right => MouseButton::Right,
+                            _ => MouseButton::Other,
+                        };
+                        let state = match state {
+                            ElementState::Pressed => true,
+                            ElementState::Released => false,
+                        };
                         vis.mouse_input(&window.gl, button, state);
                     }
                     WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
