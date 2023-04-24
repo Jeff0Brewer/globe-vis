@@ -13,11 +13,11 @@ impl Globe {
     pub fn new(gl: &glow::Context, shader_version: &str) -> Result<Self, GlobeError> {
         let data = get_icosphere(4);
         let buffer = Buffer::new(gl, &data, glow::DYNAMIC_DRAW)?;
-        let program = Program::new_from_files(
+        let program = Program::new_from_sources(
             gl,
             shader_version,
-            "./shaders/vert.glsl",
-            "./shaders/frag.glsl",
+            include_str!("../shaders/vert.glsl"),
+            include_str!("../shaders/frag.glsl"),
         )?;
         Ok(Self {
             program,

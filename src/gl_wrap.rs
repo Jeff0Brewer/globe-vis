@@ -1,6 +1,5 @@
 use glam::Mat4;
 use glow::HasContext;
-use std::fs;
 
 // free resources
 pub trait Drop {
@@ -20,11 +19,10 @@ impl Shader {
     pub fn new(
         gl: &glow::Context,
         version: &str,
-        source_file: &str,
+        source: &str,
         shader_type: u32,
     ) -> Result<Self, ShaderError> {
         // load and compile shader from text file
-        let source = fs::read_to_string(source_file)?;
         let id;
         unsafe {
             id = gl.create_shader(shader_type)?;
@@ -92,14 +90,14 @@ impl Program {
     }
 
     // constructor from files for convenience
-    pub fn new_from_files(
+    pub fn new_from_sources(
         gl: &glow::Context,
         version: &str,
-        vertex_file: &str,
-        fragment_file: &str,
+        vertex_source: &str,
+        fragment_source: &str,
     ) -> Result<Self, ProgramError> {
-        let vertex_shader = Shader::new(gl, version, vertex_file, glow::VERTEX_SHADER)?;
-        let fragment_shader = Shader::new(gl, version, fragment_file, glow::FRAGMENT_SHADER)?;
+        let vertex_shader = Shader::new(gl, version, vertex_source, glow::VERTEX_SHADER)?;
+        let fragment_shader = Shader::new(gl, version, fragment_source, glow::FRAGMENT_SHADER)?;
         let result = Self::new(gl, &vertex_shader, &fragment_shader);
 
         // free no longer needed shader resources after linking

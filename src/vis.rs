@@ -3,6 +3,8 @@ use crate::globe::Globe;
 use crate::mouse::{rotate_from_mouse, zoom_from_scroll, MouseButton, MouseState};
 use glam::{Mat4, Vec3};
 use glow::HasContext;
+
+#[cfg(not(target_arch = "wasm32"))]
 mod native {
     pub use glutin::dpi::LogicalSize;
     pub use glutin::event::MouseButton as MouseButtonGlutin;
@@ -11,6 +13,12 @@ mod native {
     pub use glutin::event_loop::EventLoop;
     pub use glutin::window::WindowBuilder;
     pub use glutin::ContextBuilder;
+}
+
+#[cfg(target_arch = "wasm32")]
+mod web {
+    pub use wasm_bindgen::JsCast;
+    pub use web_sys::{window, HtmlCanvasElement, WebGl2RenderingContext};
 }
 
 // wrapper for initialization and running vis
@@ -109,7 +117,50 @@ impl Drop for VisGl {
     }
 }
 
+#[cfg(target_arch = "wasm32")]
+struct VisContext {
+    pub gl: glow::Context,
+    pub shader_version: String,
+}
+
+#[cfg(target_arch = "wasm32")]
+impl VisContext {
+    pub fn new(width: f64, height: f64) -> Result<Self, VisError> {
+        use web::*;
+        let canvas = window()
+            .unwrap()
+            .document()
+            .unwrap()
+            .get_element_by_id("canvas")
+            .unwrap()
+            .dyn_into::<HtmlCanvasElement>()
+            .unwrap();
+        canvas.set_width(width as u32);
+        canvas.set_height(height as u32);
+        let ctx = canvas
+            .get_context("webgl2")
+            .unwrap()
+            .unwrap()
+            .dyn_into::<WebGl2RenderingContext>()
+            .unwrap();
+        let gl = glow::Context::from_webgl2_context(ctx);
+        unsafe {
+            gl.enable(glow::DEPTH_TEST);
+        }
+        let shader_version = String::from("#version 300 es");
+        Ok(Self { gl, shader_version })
+    }
+
+    pub fn run(window: VisContext, mut vis: VisGl) -> Result<(), VisError> {
+        vis.setup_gl_resources(&window.gl)?;
+        let mut draw = VisGl::get_draw();
+        draw(&window.gl, &mut vis);
+        Ok(())
+    }
+}
+
 // contains gl context, window, event loop
+#[cfg(not(target_arch = "wasm32"))]
 struct VisContext {
     pub gl: glow::Context,
     pub shader_version: String,
@@ -117,6 +168,7 @@ struct VisContext {
     pub event_loop: glutin::event_loop::EventLoop<()>,
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 impl VisContext {
     pub fn new(width: f64, height: f64) -> Result<Self, VisError> {
         use native::*;
@@ -234,6 +286,7 @@ pub enum VisError {
     Globe(#[from] crate::globe::GlobeError),
     #[error("{0}")]
     Attrib(#[from] crate::gl_wrap::AttribError),
+    #[cfg(not(target_arch = "wasm32"))]
     #[error("{0}")]
     CtxCreation(#[from] glutin::CreationError),
 }
