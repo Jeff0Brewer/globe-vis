@@ -127,27 +127,22 @@ struct VisContext {
 impl VisContext {
     pub fn new(width: f64, height: f64) -> Result<Self, VisError> {
         use web::*;
+        let shader_version = String::from("#version 300 es");
         let canvas = window()
-            .unwrap()
-            .document()
-            .unwrap()
-            .get_element_by_id("canvas")
-            .unwrap()
-            .dyn_into::<HtmlCanvasElement>()
-            .unwrap();
+            .and_then(|w| w.document())
+            .and_then(|d| d.get_element_by_id("canvas"))
+            .and_then(|e| e.dyn_into::<HtmlCanvasElement>().ok())
+            .ok_or(VisError::WebSys)?;
         canvas.set_width(width as u32);
         canvas.set_height(height as u32);
         let ctx = canvas
             .get_context("webgl2")
-            .unwrap()
-            .unwrap()
-            .dyn_into::<WebGl2RenderingContext>()
-            .unwrap();
+            .ok()
+            .and_then(|o| o)
+            .and_then(|e| e.dyn_into::<WebGl2RenderingContext>().ok())
+            .ok_or(VisError::WebSys)?;
         let gl = glow::Context::from_webgl2_context(ctx);
-        unsafe {
-            gl.enable(glow::DEPTH_TEST);
-        }
-        let shader_version = String::from("#version 300 es");
+        unsafe { gl.enable(glow::DEPTH_TEST) };
         Ok(Self { gl, shader_version })
     }
 
@@ -289,6 +284,9 @@ pub enum VisError {
     #[cfg(not(target_arch = "wasm32"))]
     #[error("{0}")]
     CtxCreation(#[from] glutin::CreationError),
+    #[cfg(target_arch = "wasm32")]
+    #[error("Web sys error")]
+    WebSys,
 }
 
 #[derive(Error, Debug)]
