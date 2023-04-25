@@ -134,7 +134,7 @@ impl VisContext {
             .and_then(|w| w.document())
             .and_then(|d| d.get_element_by_id("canvas"))
             .and_then(|e| e.dyn_into::<HtmlCanvasElement>().ok())
-            .ok_or(VisError::WebSys)?;
+            .ok_or(VisError::Canvas)?;
         canvas.set_width(width as u32);
         canvas.set_height(height as u32);
         let ctx = canvas
@@ -142,7 +142,7 @@ impl VisContext {
             .ok()
             .and_then(|o| o)
             .and_then(|e| e.dyn_into::<WebGl2RenderingContext>().ok())
-            .ok_or(VisError::WebSys)?;
+            .ok_or(VisError::WebGl2Context)?;
         let gl = glow::Context::from_webgl2_context(ctx);
         Ok(Self { gl, shader_version })
     }
@@ -285,8 +285,11 @@ pub enum VisError {
     #[error("{0}")]
     CtxCreation(#[from] glutin::CreationError),
     #[cfg(target_arch = "wasm32")]
-    #[error("Web sys error")]
-    WebSys,
+    #[error("Web sys canvas retrieval failed")]
+    Canvas,
+    #[cfg(target_arch = "wasm32")]
+    #[error("Web sys webgl2 context creation failed")]
+    WebGl2Context,
 }
 
 #[derive(Error, Debug)]
