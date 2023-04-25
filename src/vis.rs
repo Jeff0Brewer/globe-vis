@@ -99,6 +99,8 @@ impl VisGl {
         unsafe {
             let vao = gl.create_vertex_array().unwrap();
             gl.bind_vertex_array(Some(vao));
+            gl.enable(glow::DEPTH_TEST);
+            gl.clear_color(0.0, 0.0, 0.0, 1.0);
         }
         self.globe.program.bind(gl);
         self.globe.buffer.bind(gl);
@@ -142,7 +144,6 @@ impl VisContext {
             .and_then(|e| e.dyn_into::<WebGl2RenderingContext>().ok())
             .ok_or(VisError::WebSys)?;
         let gl = glow::Context::from_webgl2_context(ctx);
-        unsafe { gl.enable(glow::DEPTH_TEST) };
         Ok(Self { gl, shader_version })
     }
 
@@ -179,7 +180,6 @@ impl VisContext {
         unsafe {
             ctx = ctx_builder.make_current().unwrap();
             gl = glow::Context::from_loader_function(|x| ctx.get_proc_address(x) as *const _);
-            gl.enable(glow::DEPTH_TEST);
         }
         let shader_version = String::from("#version 410");
         Ok(Self {
