@@ -2,6 +2,7 @@ use crate::gl_wrap::Drop;
 use crate::mouse::MouseButtons;
 use crate::vis::{VisGl, VisGlError};
 
+// use glutin when compiling to native
 #[cfg(not(target_arch = "wasm32"))]
 mod native {
     pub use glutin::{
@@ -16,6 +17,7 @@ mod native {
 #[cfg(not(target_arch = "wasm32"))]
 use native::*;
 
+// use winit when compiling to wasm
 #[cfg(target_arch = "wasm32")]
 mod web {
     pub use wasm_bindgen::JsCast;
@@ -32,6 +34,7 @@ mod web {
 #[cfg(target_arch = "wasm32")]
 use web::*;
 
+// contains gl context and main event loop
 pub struct VisContext {
     pub gl: glow::Context,
     pub event_loop: EventLoop<()>,
@@ -40,6 +43,7 @@ pub struct VisContext {
 }
 
 impl VisContext {
+    // native constructor, initialize glutin window and get context
     #[cfg(not(target_arch = "wasm32"))]
     pub fn new(width: f64, height: f64) -> Result<Self, VisContextError> {
         let shader_version = String::from("#version 410");
@@ -63,6 +67,7 @@ impl VisContext {
         })
     }
 
+    // wasm constructor, init winit window, create canvas with webgl2 ctx and append to dom
     #[cfg(target_arch = "wasm32")]
     pub fn new(width: f64, height: f64) -> Result<Self, VisContextError> {
         let shader_version = String::from("#version 300 es");
@@ -96,16 +101,29 @@ impl VisContext {
         })
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
+    fn redraw(window: &VisWindow) {
+        window.swap_buffers().unwrap();
+        window.window().request_redraw();
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    fn redraw(window: &VisWindow) {
+        window.request_redraw();
+    }
+
     // window passed as argument since running event loop causes move
     // calls vis event handlers on event
     pub fn run(context: VisContext, mut vis: VisGl) -> Result<(), VisContextError> {
         vis.setup_gl_resources(&context.gl)?;
         let mut draw = VisGl::get_draw();
+
         context.event_loop.run(move |event, _, control_flow| {
             #[cfg(not(target_arch = "wasm32"))]
             control_flow.set_wait();
             #[cfg(target_arch = "wasm32")]
             control_flow.set_poll();
+
             match event {
                 Event::WindowEvent { event, .. } => match event {
                     WindowEvent::CursorMoved { position, .. } => {
@@ -144,21 +162,7 @@ impl VisContext {
             }
         });
     }
-
-    #[cfg(not(target_arch = "wasm32"))]
-    fn redraw(window: &VisWindow) {
-        window.swap_buffers().unwrap();
-        window.window().request_redraw();
-    }
-
-    #[cfg(target_arch = "wasm32")]
-    fn redraw(window: &VisWindow) {
-        window.request_redraw();
-    }
 }
-
-#[cfg(target_arch = "wasm32")]
-impl VisContext {}
 
 use thiserror::Error;
 
