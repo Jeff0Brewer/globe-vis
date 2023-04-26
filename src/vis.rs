@@ -19,6 +19,13 @@ mod native {
 mod web {
     pub use wasm_bindgen::JsCast;
     pub use web_sys::{window, HtmlCanvasElement, WebGl2RenderingContext};
+    pub use winit::{
+        event::MouseButton as MouseButtonWinit,
+        event::{ElementState, Event, MouseScrollDelta, WindowEvent},
+        event_loop::{ControlFlow, EventLoop},
+        platform::web::WindowExtWebSys,
+        window::WindowBuilder,
+    };
 }
 
 // wrapper for initialization and running vis
@@ -123,6 +130,8 @@ impl Drop for VisGl {
 struct VisContext {
     pub gl: glow::Context,
     pub shader_version: String,
+    pub window: winit::window::Window,
+    pub event_loop: winit::event_loop::EventLoop<()>,
 }
 
 #[cfg(target_arch = "wasm32")]
@@ -130,13 +139,23 @@ impl VisContext {
     pub fn new(width: f64, height: f64) -> Result<Self, VisError> {
         use web::*;
         let shader_version = String::from("#version 300 es");
-        let canvas = window()
-            .and_then(|w| w.document())
-            .and_then(|d| d.get_element_by_id("canvas"))
-            .and_then(|e| e.dyn_into::<HtmlCanvasElement>().ok())
-            .ok_or(VisError::Canvas)?;
+        let event_loop = EventLoop::new();
+        let winit_window = WindowBuilder::new()
+            .with_title("window")
+            .build(&event_loop)
+            .unwrap();
+        let canvas = winit_window.canvas();
+        let window = window().unwrap();
+        let document = window.document().unwrap();
+        let body = document.body().unwrap();
+
+        canvas
+            .style()
+            .set_css_text(&format!("width: {:.0}px; height: {:.0}px;", width, height));
         canvas.set_width(width as u32);
         canvas.set_height(height as u32);
+        body.append_child(&canvas).unwrap();
+
         let ctx = canvas
             .get_context("webgl2")
             .ok()
@@ -144,14 +163,55 @@ impl VisContext {
             .and_then(|e| e.dyn_into::<WebGl2RenderingContext>().ok())
             .ok_or(VisError::WebGl2Context)?;
         let gl = glow::Context::from_webgl2_context(ctx);
-        Ok(Self { gl, shader_version })
+        Ok(Self {
+            gl,
+            shader_version,
+            window: winit_window,
+            event_loop,
+        })
     }
 
-    pub fn run(window: VisContext, mut vis: VisGl) -> Result<(), VisError> {
-        vis.setup_gl_resources(&window.gl)?;
+    pub fn run(context: VisContext, mut vis: VisGl) -> Result<(), VisError> {
+        use web::*;
+        vis.setup_gl_resources(&context.gl)?;
         let mut draw = VisGl::get_draw();
-        draw(&window.gl, &mut vis);
-        Ok(())
+
+        context.event_loop.run(move |event, _, control_flow| {
+            *control_flow = ControlFlow::Poll;
+            match event {
+                Event::WindowEvent { event, .. } => match event {
+                    WindowEvent::CursorMoved { position, .. } => {
+                        vis.mouse_move(&context.gl, position.x, position.y);
+                    }
+                    WindowEvent::MouseWheel { delta, .. } => {
+                        let ds = match delta {
+                            MouseScrollDelta::PixelDelta(position) => position.y,
+                            MouseScrollDelta::LineDelta(_, y) => y as f64,
+                        };
+                        vis.mouse_wheel(&context.gl, ds);
+                    }
+                    WindowEvent::MouseInput { button, state, .. } => {
+                        let button = match button {
+                            MouseButtonWinit::Left => MouseButton::Left,
+                            MouseButtonWinit::Right => MouseButton::Right,
+                            _ => MouseButton::Other,
+                        };
+                        let state = match state {
+                            ElementState::Pressed => true,
+                            ElementState::Released => false,
+                        };
+                        vis.mouse_input(&context.gl, button, state);
+                    }
+                    WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
+                    _ => (),
+                },
+                Event::RedrawRequested(_) => {
+                    draw(&context.gl, &mut vis);
+                    context.window.request_redraw();
+                }
+                _ => (),
+            }
+        });
     }
 }
 
