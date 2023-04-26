@@ -5,6 +5,7 @@ mod globe;
 mod icosphere;
 mod mouse;
 mod vis;
+mod vis_ctx;
 use vis::Vis;
 
 fn main() {

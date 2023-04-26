@@ -1,32 +1,9 @@
 use crate::gl_wrap::{set_attrib, Bind, Drop, Program, UniformMatrix};
 use crate::globe::Globe;
 use crate::mouse::{rotate_from_mouse, zoom_from_scroll, MouseButton, MouseState};
+use crate::vis_ctx::{VisContext, VisContextError};
 use glam::{Mat4, Vec3};
 use glow::HasContext;
-
-#[cfg(not(target_arch = "wasm32"))]
-mod native {
-    pub use glutin::dpi::LogicalSize;
-    pub use glutin::event::MouseButton as MouseButtonGlutin;
-    pub use glutin::event::{ElementState, Event, MouseScrollDelta, WindowEvent};
-    pub use glutin::event_loop::ControlFlow;
-    pub use glutin::event_loop::EventLoop;
-    pub use glutin::window::WindowBuilder;
-    pub use glutin::ContextBuilder;
-}
-
-#[cfg(target_arch = "wasm32")]
-mod web {
-    pub use wasm_bindgen::JsCast;
-    pub use web_sys::{window, HtmlCanvasElement, WebGl2RenderingContext};
-    pub use winit::{
-        event::MouseButton as MouseButtonWinit,
-        event::{ElementState, Event, MouseScrollDelta, WindowEvent},
-        event_loop::{ControlFlow, EventLoop},
-        platform::web::WindowExtWebSys,
-        window::WindowBuilder,
-    };
-}
 
 // wrapper for initialization and running vis
 pub struct Vis {
@@ -51,21 +28,21 @@ impl Vis {
 }
 
 // contains all vis logic and gl resources
-struct VisGl {
+pub struct VisGl {
     pub globe: Globe,
     pub mvp: MvpMatrices,
     pub mouse: MouseState,
 }
 
 impl VisGl {
-    pub fn new(context: &VisContext, width: f64, height: f64) -> Result<Self, VisError> {
+    pub fn new(context: &VisContext, width: f64, height: f64) -> Result<Self, VisGlError> {
         let mouse = MouseState::new();
         let globe = Globe::new(&context.gl, &context.shader_version)?;
         let mvp = MvpMatrices::new_default(&context.gl, &globe.program, (width / height) as f32)?;
         Ok(Self { globe, mvp, mouse })
     }
 
-    fn mouse_move(&mut self, gl: &glow::Context, x: f64, y: f64) {
+    pub fn mouse_move(&mut self, gl: &glow::Context, x: f64, y: f64) {
         if self.mouse.dragging {
             let dx = x - self.mouse.x;
             let dy = y - self.mouse.y;
@@ -78,14 +55,14 @@ impl VisGl {
         self.mouse.y = y;
     }
 
-    fn mouse_input(&mut self, _: &glow::Context, button: MouseButton, pressed: bool) {
+    pub fn mouse_input(&mut self, _: &glow::Context, button: MouseButton, pressed: bool) {
         // save mouse drag state on left mouse input
         if let MouseButton::Left = button {
             self.mouse.dragging = pressed;
         }
     }
 
-    fn mouse_wheel(&mut self, gl: &glow::Context, delta: f64) {
+    pub fn mouse_wheel(&mut self, gl: &glow::Context, delta: f64) {
         self.mvp.view.data = zoom_from_scroll(self.mvp.view.data, delta);
         self.mvp.view.apply(gl);
     }
@@ -102,7 +79,7 @@ impl VisGl {
     }
 
     // bind required resources for start of draw loop
-    pub fn setup_gl_resources(&self, gl: &glow::Context) -> Result<(), VisError> {
+    pub fn setup_gl_resources(&self, gl: &glow::Context) -> Result<(), VisGlError> {
         unsafe {
             let vao = gl.create_vertex_array().unwrap();
             gl.bind_vertex_array(Some(vao));
@@ -126,182 +103,9 @@ impl Drop for VisGl {
     }
 }
 
-#[cfg(target_arch = "wasm32")]
-struct VisContext {
-    pub gl: glow::Context,
-    pub shader_version: String,
-    pub window: winit::window::Window,
-    pub event_loop: winit::event_loop::EventLoop<()>,
-}
-
-#[cfg(target_arch = "wasm32")]
-impl VisContext {
-    pub fn new(width: f64, height: f64) -> Result<Self, VisError> {
-        use web::*;
-        let shader_version = String::from("#version 300 es");
-        let event_loop = EventLoop::new();
-        let winit_window = WindowBuilder::new()
-            .with_title("window")
-            .build(&event_loop)
-            .unwrap();
-        let canvas = winit_window.canvas();
-        let window = window().unwrap();
-        let document = window.document().unwrap();
-        let body = document.body().unwrap();
-
-        canvas
-            .style()
-            .set_css_text(&format!("width: {:.0}px; height: {:.0}px;", width, height));
-        canvas.set_width(width as u32);
-        canvas.set_height(height as u32);
-        body.append_child(&canvas).unwrap();
-
-        let ctx = canvas
-            .get_context("webgl2")
-            .ok()
-            .and_then(|o| o)
-            .and_then(|e| e.dyn_into::<WebGl2RenderingContext>().ok())
-            .ok_or(VisError::WebGl2Context)?;
-        let gl = glow::Context::from_webgl2_context(ctx);
-        Ok(Self {
-            gl,
-            shader_version,
-            window: winit_window,
-            event_loop,
-        })
-    }
-
-    pub fn run(context: VisContext, mut vis: VisGl) -> Result<(), VisError> {
-        use web::*;
-        vis.setup_gl_resources(&context.gl)?;
-        let mut draw = VisGl::get_draw();
-
-        context.event_loop.run(move |event, _, control_flow| {
-            *control_flow = ControlFlow::Poll;
-            match event {
-                Event::WindowEvent { event, .. } => match event {
-                    WindowEvent::CursorMoved { position, .. } => {
-                        vis.mouse_move(&context.gl, position.x, position.y);
-                    }
-                    WindowEvent::MouseWheel { delta, .. } => {
-                        let ds = match delta {
-                            MouseScrollDelta::PixelDelta(position) => position.y,
-                            MouseScrollDelta::LineDelta(_, y) => y as f64,
-                        };
-                        vis.mouse_wheel(&context.gl, ds);
-                    }
-                    WindowEvent::MouseInput { button, state, .. } => {
-                        let button = match button {
-                            MouseButtonWinit::Left => MouseButton::Left,
-                            MouseButtonWinit::Right => MouseButton::Right,
-                            _ => MouseButton::Other,
-                        };
-                        let state = match state {
-                            ElementState::Pressed => true,
-                            ElementState::Released => false,
-                        };
-                        vis.mouse_input(&context.gl, button, state);
-                    }
-                    WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
-                    _ => (),
-                },
-                Event::RedrawRequested(_) => {
-                    draw(&context.gl, &mut vis);
-                    context.window.request_redraw();
-                }
-                _ => (),
-            }
-        });
-    }
-}
-
-// contains gl context, window, event loop
-#[cfg(not(target_arch = "wasm32"))]
-struct VisContext {
-    pub gl: glow::Context,
-    pub shader_version: String,
-    pub ctx: glutin::ContextWrapper<glutin::PossiblyCurrent, glutin::window::Window>,
-    pub event_loop: glutin::event_loop::EventLoop<()>,
-}
-
-#[cfg(not(target_arch = "wasm32"))]
-impl VisContext {
-    pub fn new(width: f64, height: f64) -> Result<Self, VisError> {
-        use native::*;
-        let event_loop = EventLoop::new();
-        let window = WindowBuilder::new()
-            .with_inner_size(LogicalSize::new(width, height))
-            .with_title("window");
-        let ctx_builder = ContextBuilder::new()
-            .with_multisampling(4)
-            .build_windowed(window, &event_loop)?;
-        let ctx;
-        let gl;
-        unsafe {
-            ctx = ctx_builder.make_current().unwrap();
-            gl = glow::Context::from_loader_function(|x| ctx.get_proc_address(x) as *const _);
-        }
-        let shader_version = String::from("#version 410");
-        Ok(Self {
-            gl,
-            shader_version,
-            ctx,
-            event_loop,
-        })
-    }
-
-    // window passed as argument since running event loop causes move
-    // calls vis event handlers on event
-    pub fn run(window: VisContext, mut vis: VisGl) -> Result<(), VisError> {
-        use native::*;
-        vis.setup_gl_resources(&window.gl)?;
-        let mut draw = VisGl::get_draw();
-        window.event_loop.run(move |event, _, control_flow| {
-            *control_flow = ControlFlow::Wait;
-            match event {
-                Event::WindowEvent { event, .. } => match event {
-                    WindowEvent::CursorMoved { position, .. } => {
-                        vis.mouse_move(&window.gl, position.x, position.y);
-                    }
-                    WindowEvent::MouseWheel { delta, .. } => {
-                        let ds = match delta {
-                            MouseScrollDelta::PixelDelta(position) => position.y,
-                            MouseScrollDelta::LineDelta(_, y) => y as f64,
-                        };
-                        vis.mouse_wheel(&window.gl, ds);
-                    }
-                    WindowEvent::MouseInput { button, state, .. } => {
-                        let button = match button {
-                            MouseButtonGlutin::Left => MouseButton::Left,
-                            MouseButtonGlutin::Right => MouseButton::Right,
-                            _ => MouseButton::Other,
-                        };
-                        let state = match state {
-                            ElementState::Pressed => true,
-                            ElementState::Released => false,
-                        };
-                        vis.mouse_input(&window.gl, button, state);
-                    }
-                    WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
-                    _ => (),
-                },
-                Event::LoopDestroyed => {
-                    vis.drop(&window.gl);
-                }
-                Event::RedrawRequested(_) => {
-                    draw(&window.gl, &mut vis);
-                    window.ctx.swap_buffers().unwrap();
-                    window.ctx.window().request_redraw();
-                }
-                _ => (),
-            }
-        });
-    }
-}
-
 // matrices for 3D scene
 // one instance for all programs, same matrices used everywhere
-struct MvpMatrices {
+pub struct MvpMatrices {
     pub proj: UniformMatrix,
     pub view: UniformMatrix,
     pub model: UniformMatrix,
@@ -335,6 +139,14 @@ use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum VisError {
+    #[error("{0}")]
+    VisGl(#[from] VisGlError),
+    #[error("{0}")]
+    VisContext(#[from] VisContextError),
+}
+
+#[derive(Error, Debug)]
+pub enum VisGlError {
     #[error("{0}")]
     Mvp(#[from] MvpError),
     #[error("{0}")]
