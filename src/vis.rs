@@ -153,15 +153,6 @@ pub enum VisGlError {
     Globe(#[from] crate::globe::GlobeError),
     #[error("{0}")]
     Attrib(#[from] crate::gl_wrap::AttribError),
-    #[cfg(not(target_arch = "wasm32"))]
-    #[error("{0}")]
-    CtxCreation(#[from] glutin::CreationError),
-    #[cfg(target_arch = "wasm32")]
-    #[error("Web sys canvas retrieval failed")]
-    Canvas,
-    #[cfg(target_arch = "wasm32")]
-    #[error("Web sys webgl2 context creation failed")]
-    WebGl2Context,
 }
 
 #[derive(Error, Debug)]
