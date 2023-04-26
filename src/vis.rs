@@ -1,6 +1,6 @@
 use crate::gl_wrap::{set_attrib, Bind, Drop, Program, UniformMatrix};
 use crate::globe::Globe;
-use crate::mouse::{rotate_from_mouse, zoom_from_scroll, MouseButton, MouseState};
+use crate::mouse::{rotate_from_mouse, zoom_from_scroll, MouseButtons, MouseState};
 use crate::vis_ctx::{VisContext, VisContextError};
 use glam::{Mat4, Vec3};
 use glow::HasContext;
@@ -55,9 +55,9 @@ impl VisGl {
         self.mouse.y = y;
     }
 
-    pub fn mouse_input(&mut self, _: &glow::Context, button: MouseButton, pressed: bool) {
+    pub fn mouse_input(&mut self, _: &glow::Context, button: MouseButtons, pressed: bool) {
         // save mouse drag state on left mouse input
-        if let MouseButton::Left = button {
+        if let MouseButtons::Left = button {
             self.mouse.dragging = pressed;
         }
     }

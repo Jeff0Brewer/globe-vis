@@ -1,16 +1,16 @@
 use crate::gl_wrap::Drop;
-use crate::mouse::MouseButton;
+use crate::mouse::MouseButtons;
 use crate::vis::{VisGl, VisGlError};
 #[cfg(not(target_arch = "wasm32"))]
 mod native {
     pub use glutin::{
         dpi::LogicalSize,
-        event::MouseButton as MouseButtonGlutin,
-        event::{ElementState, Event, MouseScrollDelta, WindowEvent},
+        event::{ElementState, Event, MouseButton, MouseScrollDelta, WindowEvent},
         event_loop::{ControlFlow, EventLoop},
         window::{Window, WindowBuilder},
         ContextBuilder, ContextWrapper, PossiblyCurrent,
     };
+    pub type VisWindow = ContextWrapper<PossiblyCurrent, Window>;
 }
 #[cfg(not(target_arch = "wasm32"))]
 use native::*;
@@ -21,34 +21,25 @@ mod web {
     pub use web_sys::{window, HtmlCanvasElement, WebGl2RenderingContext};
     pub use winit::{
         event::MouseButton as MouseButtonWinit,
-        event::{ElementState, Event, MouseScrollDelta, WindowEvent},
+        event::{ElementState, Event, MouseButton, MouseScrollDelta, WindowEvent},
         event_loop::{ControlFlow, EventLoop},
         platform::web::WindowExtWebSys,
         window::{Window, WindowBuilder},
     };
+    pub type VisWindow = Window;
 }
 #[cfg(target_arch = "wasm32")]
 use web::*;
 
-// contains gl context, window, event loop
-#[cfg(not(target_arch = "wasm32"))]
 pub struct VisContext {
     pub gl: glow::Context,
-    pub window: ContextWrapper<PossiblyCurrent, Window>,
     pub event_loop: EventLoop<()>,
     pub shader_version: String,
+    pub window: VisWindow,
 }
 
-#[cfg(target_arch = "wasm32")]
-pub struct VisContext {
-    pub gl: glow::Context,
-    pub window: Window,
-    pub event_loop: EventLoop<()>,
-    pub shader_version: String,
-}
-
-#[cfg(not(target_arch = "wasm32"))]
 impl VisContext {
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn new(width: f64, height: f64) -> Result<Self, VisContextError> {
         let event_loop = EventLoop::new();
         let window_builder = WindowBuilder::new()
@@ -72,56 +63,7 @@ impl VisContext {
         })
     }
 
-    // window passed as argument since running event loop causes move
-    // calls vis event handlers on event
-    pub fn run(context: VisContext, mut vis: VisGl) -> Result<(), VisContextError> {
-        vis.setup_gl_resources(&context.gl)?;
-        let mut draw = VisGl::get_draw();
-        context.event_loop.run(move |event, _, control_flow| {
-            *control_flow = ControlFlow::Wait;
-            match event {
-                Event::WindowEvent { event, .. } => match event {
-                    WindowEvent::CursorMoved { position, .. } => {
-                        vis.mouse_move(&context.gl, position.x, position.y);
-                    }
-                    WindowEvent::MouseWheel { delta, .. } => {
-                        let ds = match delta {
-                            MouseScrollDelta::PixelDelta(position) => position.y,
-                            MouseScrollDelta::LineDelta(_, y) => y as f64,
-                        };
-                        vis.mouse_wheel(&context.gl, ds);
-                    }
-                    WindowEvent::MouseInput { button, state, .. } => {
-                        let button = match button {
-                            MouseButtonGlutin::Left => MouseButton::Left,
-                            MouseButtonGlutin::Right => MouseButton::Right,
-                            _ => MouseButton::Other,
-                        };
-                        let state = match state {
-                            ElementState::Pressed => true,
-                            ElementState::Released => false,
-                        };
-                        vis.mouse_input(&context.gl, button, state);
-                    }
-                    WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
-                    _ => (),
-                },
-                Event::LoopDestroyed => {
-                    vis.drop(&context.gl);
-                }
-                Event::RedrawRequested(_) => {
-                    draw(&context.gl, &mut vis);
-                    context.window.swap_buffers().unwrap();
-                    context.window.window().request_redraw();
-                }
-                _ => (),
-            }
-        });
-    }
-}
-
-#[cfg(target_arch = "wasm32")]
-impl VisContext {
+    #[cfg(target_arch = "wasm32")]
     pub fn new(width: f64, height: f64) -> Result<Self, VisContextError> {
         let shader_version = String::from("#version 300 es");
         let event_loop = EventLoop::new();
@@ -133,14 +75,12 @@ impl VisContext {
         let window = window().unwrap();
         let document = window.document().unwrap();
         let body = document.body().unwrap();
-
         canvas
             .style()
             .set_css_text(&format!("width: {:.0}px; height: {:.0}px;", width, height));
         canvas.set_width(width as u32);
         canvas.set_height(height as u32);
         body.append_child(&canvas).unwrap();
-
         let ctx = canvas
             .get_context("webgl2")
             .ok()
@@ -156,12 +96,16 @@ impl VisContext {
         })
     }
 
+    // window passed as argument since running event loop causes move
+    // calls vis event handlers on event
     pub fn run(context: VisContext, mut vis: VisGl) -> Result<(), VisContextError> {
         vis.setup_gl_resources(&context.gl)?;
         let mut draw = VisGl::get_draw();
-
         context.event_loop.run(move |event, _, control_flow| {
-            *control_flow = ControlFlow::Poll;
+            #[cfg(not(target_arch = "wasm32"))]
+            control_flow.set_wait();
+            #[cfg(target_arch = "wasm32")]
+            control_flow.set_poll();
             match event {
                 Event::WindowEvent { event, .. } => match event {
                     WindowEvent::CursorMoved { position, .. } => {
@@ -176,9 +120,9 @@ impl VisContext {
                     }
                     WindowEvent::MouseInput { button, state, .. } => {
                         let button = match button {
-                            MouseButtonWinit::Left => MouseButton::Left,
-                            MouseButtonWinit::Right => MouseButton::Right,
-                            _ => MouseButton::Other,
+                            MouseButton::Left => MouseButtons::Left,
+                            MouseButton::Right => MouseButtons::Right,
+                            _ => MouseButtons::Other,
                         };
                         let state = match state {
                             ElementState::Pressed => true,
@@ -186,18 +130,35 @@ impl VisContext {
                         };
                         vis.mouse_input(&context.gl, button, state);
                     }
-                    WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
+                    WindowEvent::CloseRequested => control_flow.set_exit(),
                     _ => (),
                 },
+                Event::LoopDestroyed => {
+                    vis.drop(&context.gl);
+                }
                 Event::RedrawRequested(_) => {
                     draw(&context.gl, &mut vis);
-                    context.window.request_redraw();
+                    VisContext::redraw(&context.window);
                 }
                 _ => (),
             }
         });
     }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn redraw(window: &VisWindow) {
+        window.swap_buffers().unwrap();
+        window.window().request_redraw();
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    fn redraw(window: &VisWindow) {
+        window.request_redraw();
+    }
 }
+
+#[cfg(target_arch = "wasm32")]
+impl VisContext {}
 
 use thiserror::Error;
 
@@ -211,10 +172,4 @@ pub enum VisContextError {
     #[cfg(target_arch = "wasm32")]
     #[error("Web sys webgl2 context creation failed")]
     WebGl2Context,
-}
-
-#[derive(Error, Debug)]
-pub enum MvpError {
-    #[error("{0}")]
-    UniformMatrix(#[from] crate::gl_wrap::UniformMatrixError),
 }

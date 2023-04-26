@@ -16,7 +16,7 @@ impl MouseState {
     }
 }
 
-pub enum MouseButton {
+pub enum MouseButtons {
     Left,
     Right,
     Other,
