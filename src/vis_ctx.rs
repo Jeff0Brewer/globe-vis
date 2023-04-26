@@ -1,6 +1,7 @@
 use crate::gl_wrap::Drop;
 use crate::mouse::MouseButtons;
 use crate::vis::{VisGl, VisGlError};
+
 #[cfg(not(target_arch = "wasm32"))]
 mod native {
     pub use glutin::{
@@ -18,7 +19,7 @@ use native::*;
 #[cfg(target_arch = "wasm32")]
 mod web {
     pub use wasm_bindgen::JsCast;
-    pub use web_sys::{window, HtmlCanvasElement, WebGl2RenderingContext};
+    pub use web_sys::{HtmlCanvasElement, WebGl2RenderingContext};
     pub use winit::{
         event::MouseButton as MouseButtonWinit,
         event::{ElementState, Event, MouseButton, MouseScrollDelta, WindowEvent},
@@ -41,6 +42,7 @@ pub struct VisContext {
 impl VisContext {
     #[cfg(not(target_arch = "wasm32"))]
     pub fn new(width: f64, height: f64) -> Result<Self, VisContextError> {
+        let shader_version = String::from("#version 410");
         let event_loop = EventLoop::new();
         let window_builder = WindowBuilder::new()
             .with_inner_size(LogicalSize::new(width, height))
@@ -48,13 +50,11 @@ impl VisContext {
         let ctx_builder = ContextBuilder::new()
             .with_multisampling(4)
             .build_windowed(window_builder, &event_loop)?;
-        let gl;
-        let window;
+        let (gl, window);
         unsafe {
             window = ctx_builder.make_current().unwrap();
             gl = glow::Context::from_loader_function(|x| window.get_proc_address(x) as *const _);
         }
-        let shader_version = String::from("#version 410");
         Ok(Self {
             gl,
             window,
@@ -67,20 +67,15 @@ impl VisContext {
     pub fn new(width: f64, height: f64) -> Result<Self, VisContextError> {
         let shader_version = String::from("#version 300 es");
         let event_loop = EventLoop::new();
-        let winit_window = WindowBuilder::new()
+        let window = WindowBuilder::new()
             .with_title("window")
-            .build(&event_loop)
-            .unwrap();
-        let canvas = winit_window.canvas();
-        let window = window().unwrap();
-        let document = window.document().unwrap();
-        let body = document.body().unwrap();
+            .build(&event_loop)?;
+        let canvas = window.canvas();
         canvas
             .style()
             .set_css_text(&format!("width: {:.0}px; height: {:.0}px;", width, height));
         canvas.set_width(width as u32);
         canvas.set_height(height as u32);
-        body.append_child(&canvas).unwrap();
         let ctx = canvas
             .get_context("webgl2")
             .ok()
@@ -88,11 +83,16 @@ impl VisContext {
             .and_then(|e| e.dyn_into::<WebGl2RenderingContext>().ok())
             .ok_or(VisContextError::WebGl2Context)?;
         let gl = glow::Context::from_webgl2_context(ctx);
+        web_sys::window()
+            .and_then(|w| w.document())
+            .and_then(|d| d.body())
+            .and_then(|b| b.append_child(&canvas).ok())
+            .ok_or(VisContextError::DomBody)?;
         Ok(Self {
             gl,
-            shader_version,
-            window: winit_window,
+            window,
             event_loop,
+            shader_version,
         })
     }
 
@@ -170,6 +170,12 @@ pub enum VisContextError {
     #[error("{0}")]
     CtxCreation(#[from] glutin::CreationError),
     #[cfg(target_arch = "wasm32")]
+    #[error("Canvas element couldn't be added to web sys body")]
+    DomBody,
+    #[cfg(target_arch = "wasm32")]
     #[error("Web sys webgl2 context creation failed")]
     WebGl2Context,
+    #[cfg(target_arch = "wasm32")]
+    #[error("{0}")]
+    Os(#[from] winit::error::OsError),
 }
