@@ -1,5 +1,5 @@
 use crate::{
-    gl_wrap::{Drop, UniformMatrix},
+    gl_wrap::{Drop, Program, UniformMatrix},
     globe::Globe,
     mouse::{rotate_from_mouse, zoom_from_scroll, MouseButtons, MouseState},
     points::Points,
@@ -52,18 +52,24 @@ impl VisGl {
         })
     }
 
-    pub fn mouse_move(&mut self, gl: &glow::Context, x: f64, y: f64) {
+    pub fn mouse_move(&mut self, gl: &glow::Context, x: f64, y: f64) -> Result<(), VisGlError> {
         if self.mouse.dragging {
             let dx = x - self.mouse.x;
             let dy = y - self.mouse.y;
             // rotate model matrix from mouse move deltas
             self.mvp.model.data = rotate_from_mouse(self.mvp.model.data, dx, dy);
-            self.mvp.model.apply(gl, &self.globe.program).unwrap();
-            self.mvp.model.apply(gl, &self.points.program).unwrap();
+            self.mvp.model.apply(gl, &VisGl::programs(self))?;
         }
         // save last mouse position
         self.mouse.x = x;
         self.mouse.y = y;
+        Ok(())
+    }
+
+    pub fn mouse_wheel(&mut self, gl: &glow::Context, delta: f64) -> Result<(), VisGlError> {
+        self.mvp.view.data = zoom_from_scroll(self.mvp.view.data, delta);
+        self.mvp.view.apply(gl, &VisGl::programs(self))?;
+        Ok(())
     }
 
     pub fn mouse_input(&mut self, _: &glow::Context, button: MouseButtons, pressed: bool) {
@@ -71,12 +77,6 @@ impl VisGl {
         if let MouseButtons::Left = button {
             self.mouse.dragging = pressed;
         }
-    }
-
-    pub fn mouse_wheel(&mut self, gl: &glow::Context, delta: f64) {
-        self.mvp.view.data = zoom_from_scroll(self.mvp.view.data, delta);
-        self.mvp.view.apply(gl, &self.globe.program).unwrap();
-        self.mvp.view.apply(gl, &self.points.program).unwrap();
     }
 
     // get main draw loop as closure
@@ -99,15 +99,14 @@ impl VisGl {
             gl.clear_color(0.0, 0.0, 0.0, 1.0);
         }
         self.globe.setup_gl_resources(gl)?;
-        self.mvp.proj.apply(gl, &self.globe.program).unwrap();
-        self.mvp.view.apply(gl, &self.globe.program).unwrap();
-        self.mvp.model.apply(gl, &self.globe.program).unwrap();
-
         self.points.setup_gl_resources(gl)?;
-        self.mvp.proj.apply(gl, &self.points.program).unwrap();
-        self.mvp.view.apply(gl, &self.points.program).unwrap();
-        self.mvp.model.apply(gl, &self.points.program).unwrap();
+
+        self.mvp.apply(gl, &VisGl::programs(self)).unwrap();
         Ok(())
+    }
+
+    fn programs(vis: &VisGl) -> Vec<&Program> {
+        vec![&vis.points.program, &vis.globe.program]
     }
 }
 
@@ -140,6 +139,13 @@ impl MvpMatrices {
         let model = UniformMatrix::new("modelMatrix", Mat4::IDENTITY);
         Ok(Self { proj, view, model })
     }
+
+    pub fn apply(&self, gl: &glow::Context, programs: &[&Program]) -> Result<(), MvpError> {
+        self.proj.apply(gl, programs)?;
+        self.view.apply(gl, programs)?;
+        self.model.apply(gl, programs)?;
+        Ok(())
+    }
 }
 
 use thiserror::Error;
@@ -160,6 +166,8 @@ pub enum VisGlError {
     Points(#[from] crate::points::PointsError),
     #[error("{0}")]
     Mvp(#[from] MvpError),
+    #[error("{0}")]
+    UniformMatrix(#[from] crate::gl_wrap::UniformMatrixError),
 }
 
 #[derive(Error, Debug)]

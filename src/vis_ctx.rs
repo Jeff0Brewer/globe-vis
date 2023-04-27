@@ -134,14 +134,14 @@ impl VisContext {
             match event {
                 Event::WindowEvent { event, .. } => match event {
                     WindowEvent::CursorMoved { position, .. } => {
-                        vis.mouse_move(&context.gl, position.x, position.y);
+                        vis.mouse_move(&context.gl, position.x, position.y).unwrap();
                     }
                     WindowEvent::MouseWheel { delta, .. } => {
                         let ds = match delta {
                             MouseScrollDelta::PixelDelta(position) => position.y / context.dpi,
                             MouseScrollDelta::LineDelta(_, y) => (y as f64) * SCROLL_LINE_HEIGHT,
                         };
-                        vis.mouse_wheel(&context.gl, ds);
+                        vis.mouse_wheel(&context.gl, ds).unwrap();
                     }
                     WindowEvent::MouseInput { button, state, .. } => {
                         let button = match button {

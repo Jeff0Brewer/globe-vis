@@ -239,13 +239,19 @@ impl UniformMatrix {
         Self { name, data }
     }
 
-    pub fn apply(&self, gl: &glow::Context, program: &Program) -> Result<(), UniformMatrixError> {
-        program.bind(gl);
-        unsafe {
-            let location = gl
-                .get_uniform_location(program.id, &self.name)
-                .ok_or(UniformMatrixError::Location)?;
-            gl.uniform_matrix_4_f32_slice(Some(&location), false, &self.data.to_cols_array());
+    pub fn apply(
+        &self,
+        gl: &glow::Context,
+        programs: &[&Program],
+    ) -> Result<(), UniformMatrixError> {
+        for &program in programs {
+            program.bind(gl);
+            unsafe {
+                let location = gl
+                    .get_uniform_location(program.id, &self.name)
+                    .ok_or(UniformMatrixError::Location)?;
+                gl.uniform_matrix_4_f32_slice(Some(&location), false, &self.data.to_cols_array());
+            }
         }
         Ok(())
     }
