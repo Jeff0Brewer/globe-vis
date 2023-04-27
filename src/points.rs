@@ -1,9 +1,10 @@
-use crate::gl_wrap::{Buffer, Drop, Program};
+use crate::gl_wrap::{Bind, Buffer, Drop, Program, VertexArray};
 use glow::HasContext;
 
 pub struct Points {
     pub program: Program,
     pub buffer: Buffer,
+    pub vao: VertexArray,
 }
 
 impl Points {
@@ -15,17 +16,28 @@ impl Points {
             include_str!("../shaders/vert.glsl"),
             include_str!("../shaders/frag.glsl"),
         )?;
-        Ok(Self { program, buffer })
+        let vao = VertexArray::new(gl)?;
+        Ok(Self {
+            program,
+            buffer,
+            vao,
+        })
+    }
+
+    pub fn setup_gl_resources(&self, gl: &glow::Context) -> Result<(), PointsError> {
+        self.program.bind(gl);
+        self.buffer.bind(gl);
+        self.vao.bind(gl);
+        VertexArray::set_attrib(gl, &self.program, "position", 3, 3, 0)?;
+        Ok(())
     }
 
     pub fn get_draw() -> impl FnMut(&glow::Context, &mut Points) {
-        use rand::Rng;
-        let mut rng = rand::thread_rng();
         move |gl: &glow::Context, points: &mut Points| {
-            let data: Vec<f32> = (0..300).map(|_| rng.gen_range(1.0..2.0)).collect();
+            let data: Vec<f32> = (0..300).map(|x| x as f32 / 300.0).collect();
             points.buffer.set_data(gl, &data);
             unsafe {
-                gl.draw_arrays(glow::POINTS, 0, (data.len() / 3) as i32);
+                gl.draw_arrays(glow::POINTS, 0, (points.buffer.len / 3) as i32);
             }
         }
     }
@@ -45,4 +57,6 @@ pub enum PointsError {
     Program(#[from] crate::gl_wrap::ProgramError),
     #[error("{0}")]
     Buffer(#[from] crate::gl_wrap::BufferError),
+    #[error("{0}")]
+    VertexArray(#[from] crate::gl_wrap::VertexArrayError),
 }

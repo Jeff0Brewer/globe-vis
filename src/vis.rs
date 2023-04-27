@@ -1,7 +1,8 @@
 use crate::{
-    gl_wrap::{Bind, Drop, Program, UniformMatrix, VertexArray},
+    gl_wrap::{Drop, Program, UniformMatrix},
     globe::Globe,
     mouse::{rotate_from_mouse, zoom_from_scroll, MouseButtons, MouseState},
+    points::Points,
     vis_ctx::{VisContext, VisContextError},
 };
 use glam::{Mat4, Vec3};
@@ -32,6 +33,7 @@ impl Vis {
 // contains all vis logic and gl resources
 pub struct VisGl {
     pub globe: Globe,
+    pub points: Points,
     pub mvp: MvpMatrices,
     pub mouse: MouseState,
 }
@@ -40,8 +42,14 @@ impl VisGl {
     pub fn new(context: &VisContext, width: f64, height: f64) -> Result<Self, VisGlError> {
         let mouse = MouseState::new();
         let globe = Globe::new(&context.gl, &context.shader_version)?;
-        let mvp = MvpMatrices::new_default(&context.gl, &globe.program, (width / height) as f32)?;
-        Ok(Self { globe, mvp, mouse })
+        let points = Points::new(&context.gl, &context.shader_version)?;
+        let mvp = MvpMatrices::new_default(&context.gl, &points.program, (width / height) as f32)?;
+        Ok(Self {
+            globe,
+            points,
+            mvp,
+            mouse,
+        })
     }
 
     pub fn mouse_move(&mut self, gl: &glow::Context, x: f64, y: f64) {
@@ -71,12 +79,14 @@ impl VisGl {
 
     // get main draw loop as closure
     pub fn get_draw() -> impl FnMut(&glow::Context, &mut VisGl) {
-        let mut globe_draw = Globe::get_draw();
+        // let mut globe_draw = Globe::get_draw();
+        let mut points_draw = Points::get_draw();
         move |gl: &glow::Context, vis: &mut VisGl| {
             unsafe {
                 gl.clear(glow::COLOR_BUFFER_BIT | glow::DEPTH_BUFFER_BIT);
             }
-            globe_draw(gl, &mut vis.globe);
+            points_draw(gl, &mut vis.points);
+            // globe_draw(gl, &mut vis.globe);
         }
     }
 
@@ -86,7 +96,8 @@ impl VisGl {
             gl.enable(glow::DEPTH_TEST);
             gl.clear_color(0.0, 0.0, 0.0, 1.0);
         }
-        self.globe.setup_gl_resources(gl)?;
+        // self.globe.setup_gl_resources(gl)?;
+        self.points.setup_gl_resources(gl)?;
 
         self.mvp.proj.apply(gl);
         self.mvp.view.apply(gl);
