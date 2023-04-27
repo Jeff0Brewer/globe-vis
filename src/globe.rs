@@ -18,8 +18,8 @@ impl Globe {
         let program = Program::new_from_sources(
             gl,
             shader_version,
-            include_str!("../shaders/vert.glsl"),
-            include_str!("../shaders/frag.glsl"),
+            include_str!("../shaders/globe-vert.glsl"),
+            include_str!("../shaders/globe-frag.glsl"),
         )?;
         let vao = VertexArray::new(gl)?;
         Ok(Self {
