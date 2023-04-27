@@ -1,4 +1,4 @@
-use crate::gl_wrap::{Buffer, Drop, Program};
+use crate::gl_wrap::{Bind, Buffer, Drop, Program, VertexArray};
 use crate::icosphere::get_icosphere;
 use glow::HasContext;
 
@@ -7,6 +7,7 @@ pub struct Globe {
     pub data: Vec<f32>,
     pub program: Program,
     pub buffer: Buffer,
+    pub vao: VertexArray,
 }
 
 impl Globe {
@@ -20,10 +21,12 @@ impl Globe {
             include_str!("../shaders/vert.glsl"),
             include_str!("../shaders/frag.glsl"),
         )?;
+        let vao = VertexArray::new(gl)?;
         Ok(Self {
+            data,
             program,
             buffer,
-            data,
+            vao,
         })
     }
 
@@ -32,6 +35,14 @@ impl Globe {
         |gl: &glow::Context, globe: &mut Globe| unsafe {
             gl.draw_arrays(glow::TRIANGLES, 0, (globe.buffer.len / 3) as i32);
         }
+    }
+
+    pub fn setup_gl_resources(&self, gl: &glow::Context) -> Result<(), GlobeError> {
+        self.program.bind(gl);
+        self.buffer.bind(gl);
+        self.vao.bind(gl);
+        VertexArray::set_attrib(gl, &self.program, "position", 3, 3, 0)?;
+        Ok(())
     }
 }
 
@@ -49,4 +60,6 @@ pub enum GlobeError {
     Program(#[from] crate::gl_wrap::ProgramError),
     #[error("{0}")]
     Buffer(#[from] crate::gl_wrap::BufferError),
+    #[error("{0}")]
+    VertexArray(#[from] crate::gl_wrap::VertexArrayError),
 }

@@ -86,11 +86,7 @@ impl VisGl {
             gl.enable(glow::DEPTH_TEST);
             gl.clear_color(0.0, 0.0, 0.0, 1.0);
         }
-        self.globe.program.bind(gl);
-        self.globe.buffer.bind(gl);
-        let vao = VertexArray::new(gl).unwrap();
-        vao.bind(gl);
-        VertexArray::set_attrib(gl, &self.globe.program, "position", 3, 3, 0).unwrap();
+        self.globe.setup_gl_resources(gl)?;
 
         self.mvp.proj.apply(gl);
         self.mvp.view.apply(gl);
