@@ -1,7 +1,9 @@
-use crate::gl_wrap::{set_attrib, Bind, Drop, Program, UniformMatrix};
-use crate::globe::Globe;
-use crate::mouse::{rotate_from_mouse, zoom_from_scroll, MouseButtons, MouseState};
-use crate::vis_ctx::{VisContext, VisContextError};
+use crate::{
+    gl_wrap::{Bind, Drop, Program, UniformMatrix, VertexArray},
+    globe::Globe,
+    mouse::{rotate_from_mouse, zoom_from_scroll, MouseButtons, MouseState},
+    vis_ctx::{VisContext, VisContextError},
+};
 use glam::{Mat4, Vec3};
 use glow::HasContext;
 
@@ -74,21 +76,21 @@ impl VisGl {
             unsafe {
                 gl.clear(glow::COLOR_BUFFER_BIT | glow::DEPTH_BUFFER_BIT);
             }
-            globe_draw(gl, &mut vis.globe)
+            globe_draw(gl, &mut vis.globe);
         }
     }
 
     // bind required resources for start of draw loop
     pub fn setup_gl_resources(&self, gl: &glow::Context) -> Result<(), VisGlError> {
         unsafe {
-            let vao = gl.create_vertex_array().unwrap();
-            gl.bind_vertex_array(Some(vao));
             gl.enable(glow::DEPTH_TEST);
             gl.clear_color(0.0, 0.0, 0.0, 1.0);
         }
         self.globe.program.bind(gl);
         self.globe.buffer.bind(gl);
-        set_attrib(gl, &self.globe.program, "position", 3, 3, 0)?;
+        let vao = VertexArray::new(gl).unwrap();
+        vao.bind(gl);
+        VertexArray::set_attrib(gl, &self.globe.program, "position", 3, 3, 0).unwrap();
 
         self.mvp.proj.apply(gl);
         self.mvp.view.apply(gl);
@@ -148,11 +150,11 @@ pub enum VisError {
 #[derive(Error, Debug)]
 pub enum VisGlError {
     #[error("{0}")]
-    Mvp(#[from] MvpError),
-    #[error("{0}")]
     Globe(#[from] crate::globe::GlobeError),
     #[error("{0}")]
-    Attrib(#[from] crate::gl_wrap::AttribError),
+    Points(#[from] crate::points::PointsError),
+    #[error("{0}")]
+    Mvp(#[from] MvpError),
 }
 
 #[derive(Error, Debug)]

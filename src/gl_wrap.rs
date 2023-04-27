@@ -168,6 +168,66 @@ impl Drop for Buffer {
     }
 }
 
+pub struct VertexArray {
+    pub id: glow::VertexArray,
+}
+
+impl VertexArray {
+    pub fn new(gl: &glow::Context) -> Result<Self, VertexArrayError> {
+        let id;
+        unsafe {
+            id = gl.create_vertex_array()?;
+        }
+        Ok(Self { id })
+    }
+
+    pub fn set_attrib(
+        gl: &glow::Context,
+        program: &Program,
+        name: &str,
+        size: i32,
+        stride: i32,
+        offset: i32,
+    ) -> Result<(), VertexArrayError> {
+        let location;
+        unsafe {
+            location = gl.get_attrib_location(program.id, name);
+        }
+        match location {
+            None => Err(VertexArrayError::Location),
+            Some(location) => unsafe {
+                let fsize = std::mem::size_of::<f32>() as i32;
+                gl.vertex_attrib_pointer_f32(
+                    location,
+                    size,
+                    glow::FLOAT,
+                    false,
+                    fsize * stride,
+                    fsize * offset,
+                );
+                gl.enable_vertex_attrib_array(location);
+                Ok(())
+            },
+        }
+    }
+}
+
+impl Bind for VertexArray {
+    fn bind(&self, gl: &glow::Context) {
+        unsafe {
+            gl.bind_vertex_array(Some(self.id));
+        }
+    }
+}
+
+impl Drop for VertexArray {
+    fn drop(&self, gl: &glow::Context) {
+        unsafe {
+            gl.delete_vertex_array(self.id);
+        }
+    }
+}
+
 pub struct UniformMatrix {
     pub data: Mat4,
     location: glow::UniformLocation,
@@ -194,36 +254,6 @@ impl UniformMatrix {
         unsafe {
             gl.uniform_matrix_4_f32_slice(Some(&self.location), false, &self.data.to_cols_array());
         }
-    }
-}
-
-pub fn set_attrib(
-    gl: &glow::Context,
-    program: &Program,
-    name: &str,
-    size: i32,
-    stride: i32,
-    offset: i32,
-) -> Result<(), AttribError> {
-    let location;
-    unsafe {
-        location = gl.get_attrib_location(program.id, name);
-    }
-    match location {
-        None => Err(AttribError::Location),
-        Some(location) => unsafe {
-            let fsize = std::mem::size_of::<f32>() as i32;
-            gl.vertex_attrib_pointer_f32(
-                location,
-                size,
-                glow::FLOAT,
-                false,
-                fsize * stride,
-                fsize * offset,
-            );
-            gl.enable_vertex_attrib_array(location);
-            Ok(())
-        },
     }
 }
 
@@ -283,15 +313,23 @@ impl From<String> for BufferError {
 }
 
 #[derive(Error, Debug)]
+pub enum VertexArrayError {
+    #[error("{0}")]
+    String(String),
+    #[error("Attrib location not found")]
+    Location,
+}
+
+impl From<String> for VertexArrayError {
+    fn from(s: String) -> Self {
+        Self::String(s)
+    }
+}
+
+#[derive(Error, Debug)]
 pub enum UniformMatrixError {
     #[error("{0}")]
     Nul(#[from] std::ffi::NulError),
     #[error("Uniform location not found")]
-    Location,
-}
-
-#[derive(Error, Debug)]
-pub enum AttribError {
-    #[error("Attrib location not found")]
     Location,
 }
