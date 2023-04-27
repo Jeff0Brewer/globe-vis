@@ -22,8 +22,10 @@ pub enum MouseButtons {
     Other,
 }
 
+pub const SCROLL_LINE_HEIGHT: f64 = 25.0;
+
 const ROT_SPEED: f64 = 0.05;
-const ZOOM_SPEED: f64 = 0.03;
+const ZOOM_SPEED: f64 = 0.0005;
 
 pub fn rotate_from_mouse(mat: Mat4, dx: f64, dy: f64) -> Mat4 {
     let x_rad = (dy * ROT_SPEED) as f32;
@@ -31,9 +33,10 @@ pub fn rotate_from_mouse(mat: Mat4, dx: f64, dy: f64) -> Mat4 {
 
     // transform x / y axis by inverse of current rotation
     // to get rotation axis perpendicular to current view
+    // normalize to prevent accumulating scaling errors
     let inv_mat = mat.inverse();
-    let x_axis = inv_mat.transform_vector3(Vec3::X);
-    let y_axis = inv_mat.transform_vector3(Vec3::Y);
+    let x_axis = inv_mat.transform_vector3(Vec3::X).normalize();
+    let y_axis = inv_mat.transform_vector3(Vec3::Y).normalize();
 
     let x_rot = Mat4::from_quat(Quat::from_axis_angle(x_axis, x_rad));
     let y_rot = Mat4::from_quat(Quat::from_axis_angle(y_axis, y_rad));

@@ -13,6 +13,6 @@ fn main() {
     #[cfg(target_arch = "wasm32")]
     set_console_panic_hook();
 
-    let vis = Vis::new(500.0, 500.0).unwrap();
+    let vis = Vis::new(1000.0, 700.0).unwrap();
     Vis::start(vis).unwrap();
 }
