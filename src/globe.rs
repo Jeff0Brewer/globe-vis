@@ -32,8 +32,13 @@ impl Globe {
 
     // get draw function as closure for flexibility
     pub fn get_draw() -> impl FnMut(&glow::Context, &mut Globe) {
-        |gl: &glow::Context, globe: &mut Globe| unsafe {
-            gl.draw_arrays(glow::TRIANGLES, 0, (globe.buffer.len / 3) as i32);
+        |gl: &glow::Context, globe: &mut Globe| {
+            globe.program.bind(gl);
+            globe.buffer.bind(gl);
+            globe.vao.bind(gl);
+            unsafe {
+                gl.draw_arrays(glow::TRIANGLES, 0, (globe.buffer.len / 3) as i32);
+            }
         }
     }
 

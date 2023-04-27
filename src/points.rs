@@ -38,6 +38,9 @@ impl Points {
 
     pub fn get_draw() -> impl FnMut(&glow::Context, &mut Points) {
         move |gl: &glow::Context, points: &mut Points| {
+            points.program.bind(gl);
+            points.buffer.bind(gl);
+            points.vao.bind(gl);
             let data: Vec<f32> = (0..300).map(|x| x as f32 / 300.0).collect();
             points.buffer.set_data(gl, &data);
             unsafe {

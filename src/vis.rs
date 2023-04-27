@@ -1,5 +1,5 @@
 use crate::{
-    gl_wrap::{Drop, Program, UniformMatrix},
+    gl_wrap::{Drop, UniformMatrix},
     globe::Globe,
     mouse::{rotate_from_mouse, zoom_from_scroll, MouseButtons, MouseState},
     points::Points,
@@ -43,7 +43,7 @@ impl VisGl {
         let mouse = MouseState::new();
         let globe = Globe::new(&context.gl, &context.shader_version)?;
         let points = Points::new(&context.gl, &context.shader_version)?;
-        let mvp = MvpMatrices::new_default(&context.gl, &points.program, (width / height) as f32)?;
+        let mvp = MvpMatrices::new_default((width / height) as f32)?;
         Ok(Self {
             globe,
             points,
@@ -58,7 +58,8 @@ impl VisGl {
             let dy = y - self.mouse.y;
             // rotate model matrix from mouse move deltas
             self.mvp.model.data = rotate_from_mouse(self.mvp.model.data, dx, dy);
-            self.mvp.model.apply(gl);
+            self.mvp.model.apply(gl, &self.globe.program).unwrap();
+            self.mvp.model.apply(gl, &self.points.program).unwrap();
         }
         // save last mouse position
         self.mouse.x = x;
@@ -74,19 +75,20 @@ impl VisGl {
 
     pub fn mouse_wheel(&mut self, gl: &glow::Context, delta: f64) {
         self.mvp.view.data = zoom_from_scroll(self.mvp.view.data, delta);
-        self.mvp.view.apply(gl);
+        self.mvp.view.apply(gl, &self.globe.program).unwrap();
+        self.mvp.view.apply(gl, &self.points.program).unwrap();
     }
 
     // get main draw loop as closure
     pub fn get_draw() -> impl FnMut(&glow::Context, &mut VisGl) {
-        // let mut globe_draw = Globe::get_draw();
+        let mut globe_draw = Globe::get_draw();
         let mut points_draw = Points::get_draw();
         move |gl: &glow::Context, vis: &mut VisGl| {
             unsafe {
                 gl.clear(glow::COLOR_BUFFER_BIT | glow::DEPTH_BUFFER_BIT);
             }
+            globe_draw(gl, &mut vis.globe);
             points_draw(gl, &mut vis.points);
-            // globe_draw(gl, &mut vis.globe);
         }
     }
 
@@ -96,12 +98,15 @@ impl VisGl {
             gl.enable(glow::DEPTH_TEST);
             gl.clear_color(0.0, 0.0, 0.0, 1.0);
         }
-        // self.globe.setup_gl_resources(gl)?;
-        self.points.setup_gl_resources(gl)?;
+        self.globe.setup_gl_resources(gl)?;
+        self.mvp.proj.apply(gl, &self.globe.program).unwrap();
+        self.mvp.view.apply(gl, &self.globe.program).unwrap();
+        self.mvp.model.apply(gl, &self.globe.program).unwrap();
 
-        self.mvp.proj.apply(gl);
-        self.mvp.view.apply(gl);
-        self.mvp.model.apply(gl);
+        self.points.setup_gl_resources(gl)?;
+        self.mvp.proj.apply(gl, &self.points.program).unwrap();
+        self.mvp.view.apply(gl, &self.points.program).unwrap();
+        self.mvp.model.apply(gl, &self.points.program).unwrap();
         Ok(())
     }
 }
@@ -109,6 +114,7 @@ impl VisGl {
 impl Drop for VisGl {
     fn drop(&self, gl: &glow::Context) {
         self.globe.drop(gl);
+        self.points.drop(gl);
     }
 }
 
@@ -122,24 +128,16 @@ pub struct MvpMatrices {
 
 impl MvpMatrices {
     // initialize matrices with default values
-    pub fn new_default(
-        gl: &glow::Context,
-        program: &Program,
-        aspect: f32,
-    ) -> Result<Self, MvpError> {
+    pub fn new_default(aspect: f32) -> Result<Self, MvpError> {
         let proj = UniformMatrix::new(
-            gl,
-            program,
             "projMatrix",
             Mat4::perspective_rh_gl(1.25, aspect, 0.1, 10.0),
-        )?;
+        );
         let view = UniformMatrix::new(
-            gl,
-            program,
             "viewMatrix",
             Mat4::look_at_rh(Vec3::new(0.0, 0.0, 2.0), Vec3::ZERO, Vec3::Y),
-        )?;
-        let model = UniformMatrix::new(gl, program, "modelMatrix", Mat4::IDENTITY)?;
+        );
+        let model = UniformMatrix::new("modelMatrix", Mat4::IDENTITY);
         Ok(Self { proj, view, model })
     }
 }

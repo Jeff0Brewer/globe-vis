@@ -229,35 +229,28 @@ impl Drop for VertexArray {
 }
 
 pub struct UniformMatrix {
+    pub name: String,
     pub data: Mat4,
-    location: glow::UniformLocation,
 }
 
 impl UniformMatrix {
-    pub fn new(
-        gl: &glow::Context,
-        program: &Program,
-        name: &str,
-        data: Mat4,
-    ) -> Result<Self, UniformMatrixError> {
-        let location;
-        unsafe {
-            location = gl.get_uniform_location(program.id, name);
-        }
-        match location {
-            Some(location) => Ok(Self { location, data }),
-            None => Err(UniformMatrixError::Location),
-        }
+    pub fn new(name: &str, data: Mat4) -> Self {
+        let name = name.to_string();
+        Self { name, data }
     }
 
-    pub fn apply(&self, gl: &glow::Context) {
+    pub fn apply(&self, gl: &glow::Context, program: &Program) -> Result<(), UniformMatrixError> {
+        program.bind(gl);
         unsafe {
-            gl.uniform_matrix_4_f32_slice(Some(&self.location), false, &self.data.to_cols_array());
+            let location = gl
+                .get_uniform_location(program.id, &self.name)
+                .ok_or(UniformMatrixError::Location)?;
+            gl.uniform_matrix_4_f32_slice(Some(&location), false, &self.data.to_cols_array());
         }
+        Ok(())
     }
 }
 
-extern crate thiserror;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
