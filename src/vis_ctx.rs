@@ -1,6 +1,8 @@
-use crate::gl_wrap::Drop;
-use crate::mouse::MouseButtons;
-use crate::vis::{VisGl, VisGlError};
+use crate::{
+    gl_wrap::Drop,
+    mouse::{MouseButtons, SCROLL_LINE_HEIGHT},
+    vis::{VisGl, VisGlError},
+};
 
 // use glutin when compiling to native
 #[cfg(not(target_arch = "wasm32"))]
@@ -40,6 +42,7 @@ pub struct VisContext {
     pub event_loop: EventLoop<()>,
     pub shader_version: String,
     pub window: VisWindow,
+    pub dpi: f64,
 }
 
 impl VisContext {
@@ -59,11 +62,13 @@ impl VisContext {
             window = ctx_builder.make_current().unwrap();
             gl = glow::Context::from_loader_function(|x| window.get_proc_address(x) as *const _);
         }
+        let dpi = window.window().scale_factor();
         Ok(Self {
             gl,
             window,
             event_loop,
             shader_version,
+            dpi,
         })
     }
 
@@ -93,11 +98,13 @@ impl VisContext {
             .and_then(|d| d.body())
             .and_then(|b| b.append_child(&canvas).ok())
             .ok_or(VisContextError::DomBody)?;
+        let dpi = window.scale_factor();
         Ok(Self {
             gl,
             window,
             event_loop,
             shader_version,
+            dpi,
         })
     }
 
@@ -114,7 +121,7 @@ impl VisContext {
 
     // window passed as argument since running event loop causes move
     // calls vis event handlers on event
-    pub fn run(context: VisContext, mut vis: VisGl) -> Result<(), VisContextError> {
+    pub fn run(mut context: VisContext, mut vis: VisGl) -> Result<(), VisContextError> {
         vis.setup_gl_resources(&context.gl)?;
         let mut draw = VisGl::get_draw();
 
@@ -131,8 +138,8 @@ impl VisContext {
                     }
                     WindowEvent::MouseWheel { delta, .. } => {
                         let ds = match delta {
-                            MouseScrollDelta::PixelDelta(position) => position.y,
-                            MouseScrollDelta::LineDelta(_, y) => y as f64,
+                            MouseScrollDelta::PixelDelta(position) => position.y / context.dpi,
+                            MouseScrollDelta::LineDelta(_, y) => (y as f64) * SCROLL_LINE_HEIGHT,
                         };
                         vis.mouse_wheel(&context.gl, ds);
                     }
@@ -147,6 +154,9 @@ impl VisContext {
                             ElementState::Released => false,
                         };
                         vis.mouse_input(&context.gl, button, state);
+                    }
+                    WindowEvent::ScaleFactorChanged { scale_factor, .. } => {
+                        context.dpi = scale_factor
                     }
                     WindowEvent::CloseRequested => control_flow.set_exit(),
                     _ => (),
