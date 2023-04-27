@@ -80,12 +80,13 @@ impl VisContext {
         let window = WindowBuilder::new()
             .with_title("window")
             .build(&event_loop)?;
+        let dpi = window.scale_factor();
         let canvas = window.canvas();
         canvas
             .style()
             .set_css_text(&format!("width: {:.0}px; height: {:.0}px;", width, height));
-        canvas.set_width(width as u32);
-        canvas.set_height(height as u32);
+        canvas.set_width((width * dpi) as u32);
+        canvas.set_height((height * dpi) as u32);
         let ctx = canvas
             .get_context("webgl2")
             .ok()
@@ -98,7 +99,6 @@ impl VisContext {
             .and_then(|d| d.body())
             .and_then(|b| b.append_child(&canvas).ok())
             .ok_or(VisContextError::DomBody)?;
-        let dpi = window.scale_factor();
         Ok(Self {
             gl,
             window,
