@@ -128,21 +128,23 @@ impl Bind for Program {
 pub struct Buffer {
     pub id: glow::Buffer,
     pub draw_type: u32,
+    pub len: usize,
 }
 
 impl Buffer {
-    pub fn new(gl: &glow::Context, data: &[f32], draw_type: u32) -> Result<Self, BufferError> {
+    pub fn new(gl: &glow::Context, draw_type: u32) -> Result<Self, BufferError> {
         let id;
         unsafe {
             id = gl.create_buffer()?;
         }
-        let buffer = Self { id, draw_type };
-        buffer.set_data(gl, data);
+        let len: usize = 0;
+        let buffer = Self { id, draw_type, len };
         Ok(buffer)
     }
 
-    pub fn set_data(&self, gl: &glow::Context, data: &[f32]) {
+    pub fn set_data(&mut self, gl: &glow::Context, data: &[f32]) {
         self.bind(gl);
+        self.len = data.len();
         unsafe {
             let (_, bytes, _) = data.align_to::<u8>();
             gl.buffer_data_u8_slice(glow::ARRAY_BUFFER, bytes, self.draw_type);

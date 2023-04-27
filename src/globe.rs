@@ -12,7 +12,8 @@ pub struct Globe {
 impl Globe {
     pub fn new(gl: &glow::Context, shader_version: &str) -> Result<Self, GlobeError> {
         let data = get_icosphere(4);
-        let buffer = Buffer::new(gl, &data, glow::DYNAMIC_DRAW)?;
+        let mut buffer = Buffer::new(gl, glow::STATIC_DRAW)?;
+        buffer.set_data(gl, &data);
         let program = Program::new_from_sources(
             gl,
             shader_version,
@@ -28,19 +29,8 @@ impl Globe {
 
     // get draw function as closure for flexibility
     pub fn get_draw() -> impl FnMut(&glow::Context, &mut Globe) {
-        // temp update to buffer for testing
-        let mut buf_change = 1.0;
-        let mut buf_change_dir = 1.0;
-        move |gl: &glow::Context, globe: &mut Globe| {
-            if !(0.5..1.0).contains(&buf_change) {
-                buf_change_dir = -buf_change_dir;
-            }
-            buf_change += buf_change_dir * 0.001;
-            let data: Vec<f32> = globe.data.iter().map(|x| x * buf_change).collect();
-            globe.buffer.set_data(gl, &data);
-            unsafe {
-                gl.draw_arrays(glow::TRIANGLES, 0, (data.len() / 3) as i32);
-            }
+        |gl: &glow::Context, globe: &mut Globe| unsafe {
+            gl.draw_arrays(glow::TRIANGLES, 0, (globe.buffer.len / 3) as i32);
         }
     }
 }
