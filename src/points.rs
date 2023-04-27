@@ -13,8 +13,8 @@ impl Points {
         let program = Program::new_from_sources(
             gl,
             shader_version,
-            include_str!("../shaders/vert.glsl"),
-            include_str!("../shaders/frag.glsl"),
+            include_str!("../shaders/point-vert.glsl"),
+            include_str!("../shaders/point-frag.glsl"),
         )?;
         let vao = VertexArray::new(gl)?;
         Ok(Self {
@@ -29,6 +29,10 @@ impl Points {
         self.buffer.bind(gl);
         self.vao.bind(gl);
         VertexArray::set_attrib(gl, &self.program, "position", 3, 3, 0)?;
+        unsafe {
+            // only enable point size if points being drawn
+            gl.enable(glow::PROGRAM_POINT_SIZE);
+        }
         Ok(())
     }
 
