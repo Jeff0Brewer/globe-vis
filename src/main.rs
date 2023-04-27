@@ -4,6 +4,7 @@ mod gl_wrap;
 mod globe;
 mod icosphere;
 mod mouse;
+mod points;
 mod vis;
 mod vis_ctx;
 use vis::Vis;
