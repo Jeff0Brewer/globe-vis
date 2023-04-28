@@ -9,23 +9,33 @@ use glam::{Mat4, Vec3};
 use glow::HasContext;
 
 // wrapper for initialization and running vis
-pub struct Vis {
-    gl: VisGl,
-    window: VisContext,
+pub struct VisBuilder {
+    width: Option<f64>,
+    height: Option<f64>,
 }
 
-impl Vis {
-    pub fn new(width: f64, height: f64) -> Result<Self, VisError> {
-        // initialize gl ctx and window
-        let window = VisContext::new(width, height)?;
-        // setup vis gl resources
-        let gl = VisGl::new(&window, width, height)?;
-        Ok(Self { gl, window })
+impl VisBuilder {
+    pub fn new() -> Self {
+        let width = None;
+        let height = None;
+        Self { width, height }
     }
 
-    // vis as argument since run requires move
-    pub fn start(vis: Vis) -> Result<(), VisError> {
-        VisContext::run(vis.window, vis.gl)?;
+    // set window size
+    pub fn with_dimensions(mut self, width: f64, height: f64) -> Self {
+        self.width = Some(width);
+        self.height = Some(height);
+        self
+    }
+
+    // run visualization from prev set fields
+    pub fn start(&self) -> Result<(), VisError> {
+        let width = self.width.unwrap_or(500.0);
+        let height = self.height.unwrap_or(500.0);
+
+        let window = VisContext::new(width, height)?;
+        let gl = VisGl::new(&window, width, height)?;
+        VisContext::run(window, gl)?;
         Ok(())
     }
 }
