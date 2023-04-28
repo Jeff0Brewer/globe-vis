@@ -2,7 +2,9 @@ use crate::{
     gl_wrap::Drop,
     mouse::{MouseButtons, SCROLL_LINE_HEIGHT},
     vis::{VisGl, VisGlError},
+    UpdateFn,
 };
+use instant::Instant;
 
 // use glutin when compiling to native
 #[cfg(not(target_arch = "wasm32"))]
@@ -121,10 +123,15 @@ impl VisContext {
 
     // window passed as argument since running event loop causes move
     // calls vis event handlers on event
-    pub fn run(mut context: VisContext, mut vis: VisGl) -> Result<(), VisContextError> {
+    pub fn run(
+        mut context: VisContext,
+        mut vis: VisGl,
+        update: Option<UpdateFn>,
+    ) -> Result<(), VisContextError> {
         vis.setup_gl_resources(&context.gl)?;
         let mut draw = VisGl::get_draw();
 
+        let time = Instant::now();
         context.event_loop.run(move |event, _, control_flow| {
             #[cfg(not(target_arch = "wasm32"))]
             control_flow.set_wait();
@@ -165,7 +172,9 @@ impl VisContext {
                     vis.drop(&context.gl);
                 }
                 Event::RedrawRequested(_) => {
-                    draw(&context.gl, &mut vis);
+                    let elapsed = time.elapsed().as_millis() as f32;
+                    let data = update.map(|u| u(elapsed));
+                    draw(&context.gl, &mut vis, data);
                     VisContext::redraw(&context.window);
                 }
                 _ => (),

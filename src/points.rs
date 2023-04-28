@@ -29,20 +29,23 @@ impl Points {
         self.buffer.bind(gl);
         self.vao.bind(gl);
         VertexArray::set_attrib(gl, &self.program, "position", 3, 3, 0)?;
+        // only enable point size if points being drawn
+        // not needed for webgl
+        #[cfg(not(target_arch = "wasm32"))]
         unsafe {
-            // only enable point size if points being drawn
             gl.enable(glow::PROGRAM_POINT_SIZE);
         }
         Ok(())
     }
 
-    pub fn get_draw() -> impl FnMut(&glow::Context, &mut Points) {
-        move |gl: &glow::Context, points: &mut Points| {
+    pub fn get_draw() -> impl FnMut(&glow::Context, &mut Points, Option<Vec<f32>>) {
+        move |gl: &glow::Context, points: &mut Points, data: Option<Vec<f32>>| {
             points.program.bind(gl);
             points.buffer.bind(gl);
             points.vao.bind(gl);
-            let data: Vec<f32> = (0..300).map(|x| x as f32 / 300.0).collect();
-            points.buffer.set_data(gl, &data);
+            if let Some(d) = data {
+                points.buffer.set_data(gl, &d);
+            }
             unsafe {
                 gl.draw_arrays(glow::POINTS, 0, (points.buffer.len / 3) as i32);
             }

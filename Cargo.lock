@@ -493,6 +493,7 @@ dependencies = [
  "glam",
  "glow",
  "glutin",
+ "instant",
  "thiserror",
  "wasm-bindgen",
  "web-sys",

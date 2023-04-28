@@ -9,6 +9,14 @@ mod vis;
 mod vis_ctx;
 use vis::VisBuilder;
 
+pub type UpdateFn = fn(f32) -> Vec<f32>;
+
+fn update(ms: f32) -> Vec<f32> {
+    (0..300)
+        .map(|x| (x as f32 * (ms % 1000.0) / 1000.0) / 300.0)
+        .collect()
+}
+
 fn main() {
     // set panic hook for browser error logging
     #[cfg(target_arch = "wasm32")]
@@ -16,6 +24,7 @@ fn main() {
 
     VisBuilder::new()
         .with_dimensions(1000.0, 700.0)
+        .with_update(update)
         .start()
         .unwrap();
 }

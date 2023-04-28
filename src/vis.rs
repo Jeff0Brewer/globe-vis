@@ -4,6 +4,7 @@ use crate::{
     mouse::{rotate_from_mouse, zoom_from_scroll, MouseButtons, MouseState},
     points::Points,
     vis_ctx::{VisContext, VisContextError},
+    UpdateFn,
 };
 use glam::{Mat4, Vec3};
 use glow::HasContext;
@@ -12,19 +13,31 @@ use glow::HasContext;
 pub struct VisBuilder {
     width: Option<f64>,
     height: Option<f64>,
+    update: Option<UpdateFn>,
 }
 
 impl VisBuilder {
     pub fn new() -> Self {
         let width = None;
         let height = None;
-        Self { width, height }
+        let update = None;
+        Self {
+            width,
+            height,
+            update,
+        }
     }
 
     // set window size
     pub fn with_dimensions(mut self, width: f64, height: f64) -> Self {
         self.width = Some(width);
         self.height = Some(height);
+        self
+    }
+
+    // add update fn
+    pub fn with_update(mut self, update: UpdateFn) -> Self {
+        self.update = Some(update);
         self
     }
 
@@ -35,7 +48,7 @@ impl VisBuilder {
 
         let window = VisContext::new(width, height)?;
         let gl = VisGl::new(&window, width, height)?;
-        VisContext::run(window, gl)?;
+        VisContext::run(window, gl, self.update)?;
         Ok(())
     }
 }
@@ -90,15 +103,15 @@ impl VisGl {
     }
 
     // get main draw loop as closure
-    pub fn get_draw() -> impl FnMut(&glow::Context, &mut VisGl) {
+    pub fn get_draw() -> impl FnMut(&glow::Context, &mut VisGl, Option<Vec<f32>>) {
         let mut globe_draw = Globe::get_draw();
         let mut points_draw = Points::get_draw();
-        move |gl: &glow::Context, vis: &mut VisGl| {
+        move |gl: &glow::Context, vis: &mut VisGl, data: Option<Vec<f32>>| {
             unsafe {
                 gl.clear(glow::COLOR_BUFFER_BIT | glow::DEPTH_BUFFER_BIT);
             }
             globe_draw(gl, &mut vis.globe);
-            points_draw(gl, &mut vis.points);
+            points_draw(gl, &mut vis.points, data);
         }
     }
 
