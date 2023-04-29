@@ -2,7 +2,7 @@ use crate::{
     gl_wrap::Drop,
     mouse::{MouseButtons, SCROLL_LINE_HEIGHT},
     vis::{VisGl, VisGlError},
-    UpdateFn,
+    VisState,
 };
 use instant::Instant;
 
@@ -123,10 +123,10 @@ impl VisContext {
 
     // window passed as argument since running event loop causes move
     // calls vis event handlers on event
-    pub fn run(
+    pub fn run<T: VisState + 'static>(
         mut context: VisContext,
         mut vis: VisGl,
-        update: Option<UpdateFn>,
+        mut updater: Option<T>,
     ) -> Result<(), VisContextError> {
         vis.setup_gl_resources(&context.gl)?;
         let mut draw = VisGl::get_draw();
@@ -165,7 +165,9 @@ impl VisContext {
                     WindowEvent::ScaleFactorChanged { scale_factor, .. } => {
                         context.dpi = scale_factor
                     }
-                    WindowEvent::CloseRequested => control_flow.set_exit(),
+                    WindowEvent::CloseRequested => {
+                        control_flow.set_exit();
+                    }
                     _ => (),
                 },
                 Event::LoopDestroyed => {
@@ -173,7 +175,7 @@ impl VisContext {
                 }
                 Event::RedrawRequested(_) => {
                     let elapsed = time.elapsed().as_millis() as f32;
-                    let data = update.map(|u| u(elapsed));
+                    let data = updater.as_mut().map(|u| u.update_points(elapsed));
                     draw(&context.gl, &mut vis, data);
                     VisContext::redraw(&context.window);
                 }

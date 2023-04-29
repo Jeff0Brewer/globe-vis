@@ -9,12 +9,27 @@ mod vis;
 mod vis_ctx;
 use vis::VisBuilder;
 
-pub type UpdateFn = fn(f32) -> Vec<f32>;
+pub trait VisState {
+    fn update_points(&mut self, ms: f32) -> Vec<f32>;
+}
 
-fn update(ms: f32) -> Vec<f32> {
-    (0..300)
-        .map(|x| (x as f32 * (ms % 1000.0) / 1000.0) / 300.0)
-        .collect()
+pub struct TestState {
+    modulus: f32,
+}
+
+impl TestState {
+    pub fn new(modulus: f32) -> Self {
+        Self { modulus }
+    }
+}
+
+impl VisState for TestState {
+    fn update_points(&mut self, ms: f32) -> Vec<f32> {
+        self.modulus += 0.1;
+        (0..300)
+            .map(|x| (x as f32 * (ms % self.modulus) / self.modulus) / 300.0)
+            .collect()
+    }
 }
 
 fn main() {
@@ -22,9 +37,11 @@ fn main() {
     #[cfg(target_arch = "wasm32")]
     set_console_panic_hook();
 
+    let state = TestState::new(1000.0);
+
     VisBuilder::new()
         .with_dimensions(1000.0, 700.0)
-        .with_update(update)
+        .with_state(state)
         .start()
         .unwrap();
 }

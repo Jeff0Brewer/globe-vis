@@ -4,27 +4,27 @@ use crate::{
     mouse::{rotate_from_mouse, zoom_from_scroll, MouseButtons, MouseState},
     points::Points,
     vis_ctx::{VisContext, VisContextError},
-    UpdateFn,
+    VisState,
 };
 use glam::{Mat4, Vec3};
 use glow::HasContext;
 
 // wrapper for initialization and running vis
-pub struct VisBuilder {
+pub struct VisBuilder<T: VisState + 'static> {
     width: Option<f64>,
     height: Option<f64>,
-    update: Option<UpdateFn>,
+    state: Option<T>,
 }
 
-impl VisBuilder {
+impl<T: VisState + 'static> VisBuilder<T> {
     pub fn new() -> Self {
         let width = None;
         let height = None;
-        let update = None;
+        let state = None;
         Self {
             width,
             height,
-            update,
+            state,
         }
     }
 
@@ -36,19 +36,20 @@ impl VisBuilder {
     }
 
     // add update fn
-    pub fn with_update(mut self, update: UpdateFn) -> Self {
-        self.update = Some(update);
+    pub fn with_state(mut self, state: T) -> Self {
+        self.state = Some(state);
         self
     }
 
     // run visualization from prev set fields
-    pub fn start(&self) -> Result<(), VisError> {
+    pub fn start(&mut self) -> Result<(), VisError> {
         let width = self.width.unwrap_or(500.0);
         let height = self.height.unwrap_or(500.0);
+        let state = self.state.take();
 
         let window = VisContext::new(width, height)?;
         let gl = VisGl::new(&window, width, height)?;
-        VisContext::run(window, gl, self.update)?;
+        VisContext::run(window, gl, state)?;
         Ok(())
     }
 }
