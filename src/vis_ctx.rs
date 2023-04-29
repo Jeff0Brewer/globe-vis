@@ -129,7 +129,7 @@ impl VisContext {
         mut vis: VisGl,
         mut updater: Option<T>,
     ) -> Result<(), VisContextError> {
-        vis.setup_gl_resources(&context.gl)?;
+        vis.setup_gl(&context.gl)?;
 
         let time = Instant::now();
         context.event_loop.run(move |event, _, control_flow| {

@@ -103,15 +103,15 @@ impl VisGl {
         }
     }
 
-    // bind required resources for start of draw loop
-    pub fn setup_gl_resources(&self, gl: &glow::Context) -> Result<(), VisGlError> {
+    // set gl features and required values for start of draw loop
+    pub fn setup_gl(&self, gl: &glow::Context) -> Result<(), VisGlError> {
         unsafe {
-            gl.enable(glow::DEPTH_TEST);
             gl.clear_color(0.0, 0.0, 0.0, 1.0);
+            gl.enable(glow::DEPTH_TEST);
+            // point size feature not needed for wasm
+            #[cfg(not(target_arch = "wasm32"))]
+            gl.enable(glow::PROGRAM_POINT_SIZE);
         }
-        self.globe.setup_gl_resources(gl)?;
-        self.points.setup_gl_resources(gl)?;
-
         self.mvp.apply(gl, &VisGl::programs(self)).unwrap();
         Ok(())
     }

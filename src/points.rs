@@ -9,33 +9,26 @@ pub struct Points {
 
 impl Points {
     pub fn new(gl: &glow::Context, shader_version: &str) -> Result<Self, PointsError> {
-        let buffer = Buffer::new(gl, glow::DYNAMIC_DRAW)?;
+        // compile program from strings
         let program = Program::new_from_sources(
             gl,
             shader_version,
             include_str!("../shaders/point-vert.glsl"),
             include_str!("../shaders/point-frag.glsl"),
         )?;
+        // init empty buffer
+        let buffer = Buffer::new(gl, glow::DYNAMIC_DRAW)?;
+        // init vao and setup attributes
         let vao = VertexArray::new(gl)?;
+        program.bind(gl);
+        buffer.bind(gl);
+        vao.bind(gl);
+        VertexArray::set_attrib(gl, &program, "position", 3, 3, 0)?;
         Ok(Self {
             program,
             buffer,
             vao,
         })
-    }
-
-    pub fn setup_gl_resources(&self, gl: &glow::Context) -> Result<(), PointsError> {
-        self.program.bind(gl);
-        self.buffer.bind(gl);
-        self.vao.bind(gl);
-        VertexArray::set_attrib(gl, &self.program, "position", 3, 3, 0)?;
-        // only enable point size if points being drawn
-        // not needed for webgl
-        #[cfg(not(target_arch = "wasm32"))]
-        unsafe {
-            gl.enable(glow::PROGRAM_POINT_SIZE);
-        }
-        Ok(())
     }
 
     pub fn draw(&mut self, gl: &glow::Context, data: Option<Vec<f32>>) {

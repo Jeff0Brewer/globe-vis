@@ -12,16 +12,23 @@ pub struct Globe {
 
 impl Globe {
     pub fn new(gl: &glow::Context, shader_version: &str) -> Result<Self, GlobeError> {
-        let data = get_icosphere(4);
-        let mut buffer = Buffer::new(gl, glow::STATIC_DRAW)?;
-        buffer.set_data(gl, &data);
+        // compile program from strings
         let program = Program::new_from_sources(
             gl,
             shader_version,
             include_str!("../shaders/globe-vert.glsl"),
             include_str!("../shaders/globe-frag.glsl"),
         )?;
+        // init buffer and set data
+        let data = get_icosphere(4);
+        let mut buffer = Buffer::new(gl, glow::STATIC_DRAW)?;
+        buffer.set_data(gl, &data);
+        // init vao and setup attributes
         let vao = VertexArray::new(gl)?;
+        program.bind(gl);
+        buffer.bind(gl);
+        vao.bind(gl);
+        VertexArray::set_attrib(gl, &program, "position", 3, 3, 0)?;
         Ok(Self {
             data,
             program,
@@ -37,14 +44,6 @@ impl Globe {
         unsafe {
             gl.draw_arrays(glow::TRIANGLES, 0, (self.buffer.len / 3) as i32);
         }
-    }
-
-    pub fn setup_gl_resources(&self, gl: &glow::Context) -> Result<(), GlobeError> {
-        self.program.bind(gl);
-        self.buffer.bind(gl);
-        self.vao.bind(gl);
-        VertexArray::set_attrib(gl, &self.program, "position", 3, 3, 0)?;
-        Ok(())
     }
 }
 
