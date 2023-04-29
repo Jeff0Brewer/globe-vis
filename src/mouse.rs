@@ -24,7 +24,7 @@ pub enum MouseButtons {
 
 pub const SCROLL_LINE_HEIGHT: f64 = 25.0;
 
-const ROT_SPEED: f64 = 0.05;
+const ROT_SPEED: f64 = 0.005;
 const ZOOM_SPEED: f64 = 0.0005;
 
 pub fn rotate_from_mouse(mat: Mat4, dx: f64, dy: f64) -> Mat4 {
