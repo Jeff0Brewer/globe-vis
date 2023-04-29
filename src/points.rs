@@ -1,28 +1,23 @@
 use crate::gl_wrap::{Bind, Buffer, Drop, Program, VertexArray};
-use crate::icosphere::get_icosphere;
 use glow::HasContext;
 
-// contains gl resources / logic for drawing globe
-pub struct Globe {
-    pub data: Vec<f32>,
+pub struct Points {
     pub program: Program,
     pub buffer: Buffer,
     pub vao: VertexArray,
 }
 
-impl Globe {
-    pub fn new(gl: &glow::Context, shader_version: &str) -> Result<Self, GlobeError> {
+impl Points {
+    pub fn new(gl: &glow::Context, shader_version: &str) -> Result<Self, PointsError> {
         // compile program from strings
         let program = Program::new_from_sources(
             gl,
             shader_version,
-            include_str!("../shaders/globe-vert.glsl"),
-            include_str!("../shaders/globe-frag.glsl"),
+            include_str!("../shaders/point-vert.glsl"),
+            include_str!("../shaders/point-frag.glsl"),
         )?;
-        // init buffer and set data
-        let data = get_icosphere(4);
-        let mut buffer = Buffer::new(gl, glow::STATIC_DRAW)?;
-        buffer.set_data(gl, &data);
+        // init empty buffer
+        let buffer = Buffer::new(gl, glow::DYNAMIC_DRAW)?;
         // init vao and setup attributes
         let vao = VertexArray::new(gl)?;
         program.bind(gl);
@@ -30,24 +25,26 @@ impl Globe {
         vao.bind(gl);
         VertexArray::set_attrib(gl, &program, "position", 3, 3, 0)?;
         Ok(Self {
-            data,
             program,
             buffer,
             vao,
         })
     }
 
-    pub fn draw(&self, gl: &glow::Context) {
+    pub fn draw(&mut self, gl: &glow::Context, data: Option<Vec<f32>>) {
         self.program.bind(gl);
         self.buffer.bind(gl);
         self.vao.bind(gl);
+        if let Some(d) = data {
+            self.buffer.set_data(gl, &d);
+        }
         unsafe {
-            gl.draw_arrays(glow::TRIANGLES, 0, (self.buffer.len / 3) as i32);
+            gl.draw_arrays(glow::POINTS, 0, (self.buffer.len / 3) as i32);
         }
     }
 }
 
-impl Drop for Globe {
+impl Drop for Points {
     fn drop(&self, gl: &glow::Context) {
         self.program.drop(gl);
         self.buffer.drop(gl);
@@ -56,7 +53,7 @@ impl Drop for Globe {
 
 use thiserror::Error;
 #[derive(Error, Debug)]
-pub enum GlobeError {
+pub enum PointsError {
     #[error("{0}")]
     Program(#[from] crate::gl_wrap::ProgramError),
     #[error("{0}")]

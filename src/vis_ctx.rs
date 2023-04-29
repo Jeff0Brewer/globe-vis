@@ -1,8 +1,11 @@
 use crate::{
     gl_wrap::Drop,
     mouse::{MouseButtons, SCROLL_LINE_HEIGHT},
-    vis::{VisGl, VisGlError},
+    vis_gl::{VisGl, VisGlError},
+    VisState,
 };
+use glow::HasContext;
+use instant::Instant;
 
 // use glutin when compiling to native
 #[cfg(not(target_arch = "wasm32"))]
@@ -59,7 +62,9 @@ impl VisContext {
             .build_windowed(window_builder, &event_loop)?;
         let (gl, window);
         unsafe {
-            window = ctx_builder.make_current().unwrap();
+            window = ctx_builder
+                .make_current()
+                .map_err(|_| VisContextError::CtxCurrent)?;
             gl = glow::Context::from_loader_function(|x| window.get_proc_address(x) as *const _);
         }
         let dpi = window.window().scale_factor();
@@ -121,10 +126,14 @@ impl VisContext {
 
     // window passed as argument since running event loop causes move
     // calls vis event handlers on event
-    pub fn run(mut context: VisContext, mut vis: VisGl) -> Result<(), VisContextError> {
-        vis.setup_gl_resources(&context.gl)?;
-        let mut draw = VisGl::get_draw();
+    pub fn run<T: VisState + 'static>(
+        mut context: VisContext,
+        mut vis: VisGl,
+        mut state: Option<T>,
+    ) -> Result<(), VisContextError> {
+        vis.setup_gl(&context.gl)?;
 
+        let time = Instant::now();
         context.event_loop.run(move |event, _, control_flow| {
             #[cfg(not(target_arch = "wasm32"))]
             control_flow.set_wait();
@@ -134,14 +143,14 @@ impl VisContext {
             match event {
                 Event::WindowEvent { event, .. } => match event {
                     WindowEvent::CursorMoved { position, .. } => {
-                        vis.mouse_move(&context.gl, position.x, position.y);
+                        vis.mouse_move(&context.gl, position.x, position.y).unwrap();
                     }
                     WindowEvent::MouseWheel { delta, .. } => {
                         let ds = match delta {
                             MouseScrollDelta::PixelDelta(position) => position.y / context.dpi,
                             MouseScrollDelta::LineDelta(_, y) => (y as f64) * SCROLL_LINE_HEIGHT,
                         };
-                        vis.mouse_wheel(&context.gl, ds);
+                        vis.mouse_wheel(&context.gl, ds).unwrap();
                     }
                     WindowEvent::MouseInput { button, state, .. } => {
                         let button = match button {
@@ -158,14 +167,25 @@ impl VisContext {
                     WindowEvent::ScaleFactorChanged { scale_factor, .. } => {
                         context.dpi = scale_factor
                     }
-                    WindowEvent::CloseRequested => control_flow.set_exit(),
+                    WindowEvent::CloseRequested => {
+                        control_flow.set_exit();
+                    }
                     _ => (),
                 },
                 Event::LoopDestroyed => {
                     vis.drop(&context.gl);
                 }
                 Event::RedrawRequested(_) => {
-                    draw(&context.gl, &mut vis);
+                    let elapsed = time.elapsed().as_millis() as f32;
+                    let point_data = state.as_mut().map(|u| u.update_points(elapsed));
+
+                    unsafe {
+                        context
+                            .gl
+                            .clear(glow::COLOR_BUFFER_BIT | glow::DEPTH_BUFFER_BIT);
+                    }
+                    vis.globe.draw(&context.gl);
+                    vis.points.draw(&context.gl, point_data);
                     VisContext::redraw(&context.window);
                 }
                 _ => (),
@@ -183,6 +203,9 @@ pub enum VisContextError {
     #[cfg(not(target_arch = "wasm32"))]
     #[error("{0}")]
     CtxCreation(#[from] glutin::CreationError),
+    #[cfg(not(target_arch = "wasm32"))]
+    #[error("Context could not be made current")]
+    CtxCurrent,
     #[cfg(target_arch = "wasm32")]
     #[error("Canvas element couldn't be added to web sys body")]
     DomBody,
