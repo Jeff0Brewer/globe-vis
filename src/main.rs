@@ -5,14 +5,12 @@ mod globe;
 mod icosphere;
 mod mouse;
 mod points;
+mod state;
 mod vis_build;
 mod vis_ctx;
 mod vis_gl;
+use state::VisState;
 use vis_build::VisBuilder;
-
-pub trait VisState {
-    fn update_points(&mut self, ms: f32) -> Vec<f32>;
-}
 
 pub struct TestState {
     modulus: f32,
