@@ -103,19 +103,6 @@ impl VisGl {
         }
     }
 
-    // get main draw loop as closure
-    pub fn get_draw() -> impl FnMut(&glow::Context, &mut VisGl, Option<Vec<f32>>) {
-        let mut globe_draw = Globe::get_draw();
-        let mut points_draw = Points::get_draw();
-        move |gl: &glow::Context, vis: &mut VisGl, data: Option<Vec<f32>>| {
-            unsafe {
-                gl.clear(glow::COLOR_BUFFER_BIT | glow::DEPTH_BUFFER_BIT);
-            }
-            globe_draw(gl, &mut vis.globe);
-            points_draw(gl, &mut vis.points, data);
-        }
-    }
-
     // bind required resources for start of draw loop
     pub fn setup_gl_resources(&self, gl: &glow::Context) -> Result<(), VisGlError> {
         unsafe {

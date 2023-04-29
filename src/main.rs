@@ -15,17 +15,21 @@ pub trait VisState {
 
 pub struct TestState {
     modulus: f32,
+    last_ms: f32,
 }
 
 impl TestState {
     pub fn new(modulus: f32) -> Self {
-        Self { modulus }
+        let last_ms = 0.0;
+        Self { modulus, last_ms }
     }
 }
 
 impl VisState for TestState {
     fn update_points(&mut self, ms: f32) -> Vec<f32> {
-        self.modulus += 0.1;
+        let elapsed = ms - self.last_ms;
+        self.modulus += 0.1 * elapsed;
+        self.last_ms = ms;
         (0..300)
             .map(|x| (x as f32 * (ms % self.modulus) / self.modulus) / 300.0)
             .collect()

@@ -38,17 +38,15 @@ impl Points {
         Ok(())
     }
 
-    pub fn get_draw() -> impl FnMut(&glow::Context, &mut Points, Option<Vec<f32>>) {
-        move |gl: &glow::Context, points: &mut Points, data: Option<Vec<f32>>| {
-            points.program.bind(gl);
-            points.buffer.bind(gl);
-            points.vao.bind(gl);
-            if let Some(d) = data {
-                points.buffer.set_data(gl, &d);
-            }
-            unsafe {
-                gl.draw_arrays(glow::POINTS, 0, (points.buffer.len / 3) as i32);
-            }
+    pub fn draw(&mut self, gl: &glow::Context, data: Option<Vec<f32>>) {
+        self.program.bind(gl);
+        self.buffer.bind(gl);
+        self.vao.bind(gl);
+        if let Some(d) = data {
+            self.buffer.set_data(gl, &d);
+        }
+        unsafe {
+            gl.draw_arrays(glow::POINTS, 0, (self.buffer.len / 3) as i32);
         }
     }
 }

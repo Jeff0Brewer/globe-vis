@@ -4,6 +4,7 @@ use crate::{
     vis::{VisGl, VisGlError},
     VisState,
 };
+use glow::HasContext;
 use instant::Instant;
 
 // use glutin when compiling to native
@@ -129,7 +130,6 @@ impl VisContext {
         mut updater: Option<T>,
     ) -> Result<(), VisContextError> {
         vis.setup_gl_resources(&context.gl)?;
-        let mut draw = VisGl::get_draw();
 
         let time = Instant::now();
         context.event_loop.run(move |event, _, control_flow| {
@@ -175,8 +175,15 @@ impl VisContext {
                 }
                 Event::RedrawRequested(_) => {
                     let elapsed = time.elapsed().as_millis() as f32;
-                    let data = updater.as_mut().map(|u| u.update_points(elapsed));
-                    draw(&context.gl, &mut vis, data);
+                    let point_data = updater.as_mut().map(|u| u.update_points(elapsed));
+
+                    unsafe {
+                        context
+                            .gl
+                            .clear(glow::COLOR_BUFFER_BIT | glow::DEPTH_BUFFER_BIT);
+                    }
+                    vis.globe.draw(&context.gl);
+                    vis.points.draw(&context.gl, point_data);
                     VisContext::redraw(&context.window);
                 }
                 _ => (),
