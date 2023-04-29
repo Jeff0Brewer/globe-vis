@@ -1,7 +1,7 @@
 use crate::{
     gl_wrap::Drop,
     mouse::{MouseButtons, SCROLL_LINE_HEIGHT},
-    vis::{VisGl, VisGlError},
+    vis_gl::{VisGl, VisGlError},
     VisState,
 };
 use glow::HasContext;

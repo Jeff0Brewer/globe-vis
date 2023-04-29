@@ -3,58 +3,12 @@ use crate::{
     globe::Globe,
     mouse::{rotate_from_mouse, zoom_from_scroll, MouseButtons, MouseState},
     points::Points,
-    vis_ctx::{VisContext, VisContextError},
-    VisState,
+    vis_ctx::VisContext,
 };
 use glam::{Mat4, Vec3};
 use glow::HasContext;
 
-// wrapper for initialization and running vis
-pub struct VisBuilder<T: VisState + 'static> {
-    width: Option<f64>,
-    height: Option<f64>,
-    state: Option<T>,
-}
-
-impl<T: VisState + 'static> VisBuilder<T> {
-    pub fn new() -> Self {
-        let width = None;
-        let height = None;
-        let state = None;
-        Self {
-            width,
-            height,
-            state,
-        }
-    }
-
-    // set window size
-    pub fn with_dimensions(mut self, width: f64, height: f64) -> Self {
-        self.width = Some(width);
-        self.height = Some(height);
-        self
-    }
-
-    // add update fn
-    pub fn with_state(mut self, state: T) -> Self {
-        self.state = Some(state);
-        self
-    }
-
-    // run visualization from prev set fields
-    pub fn start(&mut self) -> Result<(), VisError> {
-        let width = self.width.unwrap_or(500.0);
-        let height = self.height.unwrap_or(500.0);
-        let state = self.state.take();
-
-        let window = VisContext::new(width, height)?;
-        let gl = VisGl::new(&window, width, height)?;
-        VisContext::run(window, gl, state)?;
-        Ok(())
-    }
-}
-
-// contains all vis logic and gl resources
+// contains all vis gl resources and camera mouse handlers
 pub struct VisGl {
     pub globe: Globe,
     pub points: Points,
@@ -160,14 +114,6 @@ impl MvpMatrices {
 }
 
 use thiserror::Error;
-
-#[derive(Error, Debug)]
-pub enum VisError {
-    #[error("{0}")]
-    VisGl(#[from] VisGlError),
-    #[error("{0}")]
-    VisContext(#[from] VisContextError),
-}
 
 #[derive(Error, Debug)]
 pub enum VisGlError {
