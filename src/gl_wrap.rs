@@ -264,12 +264,6 @@ pub enum ShaderError {
     #[error("Compilation error: {0}")]
     Compilation(String),
     #[error("{0}")]
-    Utf8(#[from] std::string::FromUtf8Error),
-    #[error("{0}")]
-    Io(#[from] std::io::Error),
-    #[error("{0}")]
-    Nul(#[from] std::ffi::NulError),
-    #[error("{0}")]
     String(String),
 }
 
@@ -283,10 +277,6 @@ impl From<String> for ShaderError {
 pub enum ProgramError {
     #[error("Linking error: {0}")]
     Linking(String),
-    #[error("{0}")]
-    Utf8(#[from] std::string::FromUtf8Error),
-    #[error("{0}")]
-    Nul(#[from] std::ffi::NulError),
     #[error("{0}")]
     Shader(#[from] ShaderError),
     #[error("{0}")]
@@ -327,8 +317,6 @@ impl From<String> for VertexArrayError {
 
 #[derive(Error, Debug)]
 pub enum UniformMatrixError {
-    #[error("{0}")]
-    Nul(#[from] std::ffi::NulError),
     #[error("Uniform location not found")]
     Location,
 }
