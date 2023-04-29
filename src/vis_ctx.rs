@@ -62,7 +62,9 @@ impl VisContext {
             .build_windowed(window_builder, &event_loop)?;
         let (gl, window);
         unsafe {
-            window = ctx_builder.make_current().unwrap();
+            window = ctx_builder
+                .make_current()
+                .map_err(|_| VisContextError::CtxCurrent)?;
             gl = glow::Context::from_loader_function(|x| window.get_proc_address(x) as *const _);
         }
         let dpi = window.window().scale_factor();
@@ -201,6 +203,9 @@ pub enum VisContextError {
     #[cfg(not(target_arch = "wasm32"))]
     #[error("{0}")]
     CtxCreation(#[from] glutin::CreationError),
+    #[cfg(not(target_arch = "wasm32"))]
+    #[error("Context could not be made current")]
+    CtxCurrent,
     #[cfg(target_arch = "wasm32")]
     #[error("Canvas element couldn't be added to web sys body")]
     DomBody,
