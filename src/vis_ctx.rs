@@ -129,7 +129,7 @@ impl VisContext {
     pub fn run<T: VisState + 'static>(
         mut context: VisContext,
         mut vis: VisGl,
-        mut updater: Option<T>,
+        mut state: Option<T>,
     ) -> Result<(), VisContextError> {
         vis.setup_gl(&context.gl)?;
 
@@ -177,7 +177,7 @@ impl VisContext {
                 }
                 Event::RedrawRequested(_) => {
                     let elapsed = time.elapsed().as_millis() as f32;
-                    let point_data = updater.as_mut().map(|u| u.update_points(elapsed));
+                    let point_data = state.as_mut().map(|u| u.update_points(elapsed));
 
                     unsafe {
                         context
