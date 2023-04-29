@@ -37,7 +37,7 @@ impl<T: VisState + 'static> VisBuilder<T> {
     }
 
     // run visualization from prev set fields
-    pub fn start(&mut self) -> Result<(), VisError> {
+    pub fn start(&mut self) -> Result<(), VisBuilderError> {
         let width = self.width.unwrap_or(500.0);
         let height = self.height.unwrap_or(500.0);
         let state = self.state.take();
@@ -52,7 +52,7 @@ impl<T: VisState + 'static> VisBuilder<T> {
 use thiserror::Error;
 
 #[derive(Error, Debug)]
-pub enum VisError {
+pub enum VisBuilderError {
     #[error("{0}")]
     VisGl(#[from] VisGlError),
     #[error("{0}")]
